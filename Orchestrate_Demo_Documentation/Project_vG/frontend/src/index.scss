@@ -1,0 +1,9 @@
+// src/index.scss
+@use '@carbon/react';
+
+body, html, #root {
+  height: 100%;
+  margin: 0;
+  font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f4f4f4; /* Carbon's standard background */
+}
