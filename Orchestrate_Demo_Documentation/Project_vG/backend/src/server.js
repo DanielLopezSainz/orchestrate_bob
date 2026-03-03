@@ -1,70 +1,97 @@
-// backend/src/server.js - DIAGNOSTIC VERSION
 import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
+import session from 'express-session';
+import passport from 'passport';
+import { Issuer, Strategy } from 'openid-client';
+import { protect } from './middleware/auth.js';
+import { streamChat } from './clients/ibmClient.js';
+import { getIAMToken } from './services/iam.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getIAMToken } from './services/iam.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: '../.env' }); 
-
 const app = express();
-app.use(cors());
+
 app.use(express.json());
 
-const PORT = process.env.PORT || 8080;
+// 1. Session & Passport Initialization
+// Note: We use the SESSION_SECRET from your Code Engine env variables
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'fallback-secret-use-env-in-prod',
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true
+    }
+}));
 
-app.post('/api/chat', async (req, res) => {
-    // Capture variables for the diagnostic report
-    const envSnapshot = {
-        API_KEY: process.env.API_KEY ? `${process.env.API_KEY.substring(0, 5)}...` : "MISSING",
-        FULL_API_KEY_LENGTH: process.env.API_KEY?.length || 0,
-        INSTANCE_URL: process.env.ORCHESTRATE_INSTANCE_URL || "MISSING",
-        AGENT_ID: process.env.AGENT_ID || "MISSING",
-    };
+app.use(passport.initialize());
+app.use(passport.session());
 
+// 2. OIDC Strategy Setup (Identity Agnostic)
+const ibmIssuer = await Issuer.discover(process.env.OIDC_DISCOVERY_URL);
+const client = new ibmIssuer.Client({
+    client_id: process.env.OIDC_CLIENT_ID,
+    client_secret: process.env.OIDC_CLIENT_SECRET,
+    redirect_uris: [process.env.OIDC_REDIRECT_URI],
+    response_types: ['code'],
+});
+
+passport.use('oidc', new Strategy({ client }, (tokenset, userinfo, done) => {
+    return done(null, userinfo);
+}));
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
+
+// 3. Auth Routes
+app.get('/auth/login', passport.authenticate('oidc'));
+
+app.get('/auth/callback', passport.authenticate('oidc', {
+    successRedirect: '/',
+    failureRedirect: '/auth/login',
+}));
+
+app.get('/auth/logout', (req, res, next) => {
+    req.logout((err) => {
+        if (err) return next(err);
+        req.session.destroy(() => {
+            res.redirect('/');
+        });
+    });
+});
+
+// 4. Protected API Route with Enhanced Diagnostics
+app.post('/api/chat', protect, async (req, res) => {
     try {
         const { message, threadId } = req.body;
-        const token = await getIAMToken(process.env.API_KEY);
-        const orchestrateUrl = `${process.env.ORCHESTRATE_INSTANCE_URL}/v1/orchestrate/${process.env.AGENT_ID}/chat/completions`;
+        const response = await streamChat(message, threadId);
 
-        const orchestrateHeaders = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        };
-        if (threadId) orchestrateHeaders['X-IBM-THREAD-ID'] = threadId;
-
-        const response = await fetch(orchestrateUrl, {
-            method: 'POST',
-            headers: orchestrateHeaders,
-            body: JSON.stringify({
-                messages: [{ role: 'user', content: message }], 
-                stream: true
-            })
-        });
-
+        // If Watsonx returns an error (4xx or 5xx)
         if (!response.ok) {
-            // CATCH THE DETAILED ERROR FROM IBM
-            const errorBody = await response.text();
+            const ibmError = await response.text();
             return res.status(response.status).json({
-                diagnostic: "IBM_API_REJECTION",
+                error: 'Watsonx API Error',
                 status: response.status,
-                ibmError: errorBody,
-                env: envSnapshot
+                ibmRaw: ibmError,
+                threadId: threadId || 'NEW_THREAD',
+                sessionId: req.sessionID // Restore diagnostic sessionId
             });
         }
 
-        // ... standard streaming logic ...
+        // Pass-through the streaming headers from Watsonx
         res.setHeader('Content-Type', 'text/event-stream');
-        const responseThreadId = response.headers.get('X-IBM-THREAD-ID');
-        if (responseThreadId) res.setHeader('X-IBM-THREAD-ID', responseThreadId);
-        res.flushHeaders(); 
+        const xThreadId = response.headers.get('X-IBM-THREAD-ID');
+        if (xThreadId) res.setHeader('X-IBM-THREAD-ID', xThreadId);
 
+        // Pipe the stream directly to the browser
         const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -73,15 +100,19 @@ app.post('/api/chat', async (req, res) => {
         res.end();
 
     } catch (error) {
-        // CATCH SYSTEM ERRORS (Auth failures, Network timeouts)
+        // System-level errors (network down, IAM failed)
         res.status(500).json({
-            diagnostic: "SERVER_SYSTEM_ERROR",
-            message: error.message,
-            env: envSnapshot
+            error: error.message,
+            diagnostic: 'SERVER_INTERNAL_CRASH',
+            sessionId: req.sessionID,
+            threadId: req.body.threadId || 'N/A'
         });
     }
 });
 
+// 5. Serve Frontend
 app.use(express.static(path.join(__dirname, '../public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')));
-app.listen(PORT, () => console.log(`🚀 Diagnostic Server on ${PORT}`));
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log(`🚀 Modular Server listening on port ${PORT}`));

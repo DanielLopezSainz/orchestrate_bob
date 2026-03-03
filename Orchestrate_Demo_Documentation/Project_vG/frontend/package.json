@@ -14,7 +14,13 @@
     "@carbon/react": "^1.101.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "sass": "^1.97.3"
+    "sass": "^1.97.3",
+    "express": "^4.18.2",
+  "express-session": "^1.17.3",
+  "passport": "^0.6.0",
+  "openid-client": "^5.4.0",
+  "dotenv": "^16.0.3",
+  "cors": "^2.8.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
