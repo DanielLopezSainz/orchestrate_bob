@@ -4,7 +4,6 @@ import passport from 'passport';
 import { Issuer, Strategy } from 'openid-client';
 import { protect } from './middleware/auth.js';
 import { streamChat } from './clients/ibmClient.js';
-import { getIAMToken } from './services/iam.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -18,21 +17,21 @@ const app = express();
 app.use(express.json());
 
 // 1. Session & Passport Initialization
-// Note: We use the SESSION_SECRET from your Code Engine env variables
 app.use(session({
     secret: process.env.SESSION_SECRET || 'fallback-secret-use-env-in-prod',
     resave: false,
     saveUninitialized: true,
     cookie: {
         secure: process.env.NODE_ENV === 'production',
-        httpOnly: true
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 2. OIDC Strategy Setup (Identity Agnostic)
+// 2. OIDC Strategy Setup
 const ibmIssuer = await Issuer.discover(process.env.OIDC_DISCOVERY_URL);
 const client = new ibmIssuer.Client({
     client_id: process.env.OIDC_CLIENT_ID,
@@ -65,13 +64,12 @@ app.get('/auth/logout', (req, res, next) => {
     });
 });
 
-// 4. Protected API Route with Enhanced Diagnostics
+// 4. Protected API Route
 app.post('/api/chat', protect, async (req, res) => {
     try {
         const { message, threadId } = req.body;
         const response = await streamChat(message, threadId);
 
-        // If Watsonx returns an error (4xx or 5xx)
         if (!response.ok) {
             const ibmError = await response.text();
             return res.status(response.status).json({
@@ -79,19 +77,15 @@ app.post('/api/chat', protect, async (req, res) => {
                 status: response.status,
                 ibmRaw: ibmError,
                 threadId: threadId || 'NEW_THREAD',
-                sessionId: req.sessionID // Restore diagnostic sessionId
+                sessionId: req.sessionID
             });
         }
 
-        // Pass-through the streaming headers from Watsonx
         res.setHeader('Content-Type', 'text/event-stream');
         const xThreadId = response.headers.get('X-IBM-THREAD-ID');
         if (xThreadId) res.setHeader('X-IBM-THREAD-ID', xThreadId);
 
-        // Pipe the stream directly to the browser
         const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -100,7 +94,6 @@ app.post('/api/chat', protect, async (req, res) => {
         res.end();
 
     } catch (error) {
-        // System-level errors (network down, IAM failed)
         res.status(500).json({
             error: error.message,
             diagnostic: 'SERVER_INTERNAL_CRASH',
@@ -110,9 +103,24 @@ app.post('/api/chat', protect, async (req, res) => {
     }
 });
 
-// 5. Serve Frontend
+// 5. Global Security Gate & Static Files
+// This prevents unauthenticated users from seeing the UI at all
+app.get('/', (req, res, next) => {
+    if (!req.isAuthenticated()) {
+        return res.redirect('/auth/login');
+    }
+    next();
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')));
+
+// Protect all other frontend routes (for React Router support)
+app.get('*', (req, res) => {
+    if (!req.isAuthenticated()) {
+        return res.redirect('/auth/login');
+    }
+    res.sendFile(path.join(__dirname, '../public/index.html'));
+});
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`🚀 Modular Server listening on port ${PORT}`));
