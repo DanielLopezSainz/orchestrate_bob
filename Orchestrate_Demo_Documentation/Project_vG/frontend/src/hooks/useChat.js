@@ -1,83 +1,82 @@
-// frontend/src/hooks/useChat.js
-import { useState, useRef } from 'react';
-import { postChatMessage } from '../services/orchestrateService';
+import { useState } from 'react';
 
-export function useChat() {
+export const useChat = () => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const activeThreadId = useRef(null);
+  const [threadId, setThreadId] = useState(null);
 
-  const sendMessage = async (userText) => {
-    if (!userText.trim()) return;
+  const sendMessage = async (text) => {
+    if (!text.trim()) return;
 
+    // Add user message to UI
+    const userMsg = { role: 'user', content: text };
+    setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
-    // 1. Add User message and a placeholder for the Assistant's streaming response
-    setMessages(prev => [
-      ...prev,
-      { role: 'user', content: userText },
-      { role: 'assistant', content: '' }
-    ]);
-
     try {
-      const response = await postChatMessage(userText, activeThreadId.current);
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, threadId }),
+      });
 
-      // 2. Capture the Thread ID from headers to maintain stateful conversation
-      const threadHeader = response.headers.get('X-IBM-THREAD-ID');
-      if (threadHeader) {
-          activeThreadId.current = threadHeader;
-      }
+      if (!response.ok) throw new Error('Failed to connect to backend');
 
-      // 3. Handle the Stream
+      // Capture Thread ID from headers for continuity
+      const xThreadId = response.headers.get('X-IBM-THREAD-ID');
+      if (xThreadId) setThreadId(xThreadId);
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let done = false;
+      let assistantText = '';
 
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          const chunk = decoder.decode(value, { stream: true });
+      // Add placeholder for the assistant response
+      setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
-          // 4. Update the placeholder message with incoming text chunks
-          setMessages(prev => {
-            const newMsgs = [...prev];
-            const lastMsgIndex = newMsgs.length - 1;
-            newMsgs[lastMsgIndex] = {
-                ...newMsgs[lastMsgIndex],
-                content: newMsgs[lastMsgIndex].content + chunk
-            };
-            return newMsgs;
-          });
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          const cleanLine = line.trim();
+          if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
+
+          try {
+            const rawData = cleanLine.replace('data: ', '');
+            const data = JSON.parse(rawData);
+
+            // 1. Update text as it streams in
+            if (data.object === 'thread.message.delta' && data.choices[0].delta?.content) {
+              assistantText += data.choices[0].delta.content;
+              setMessages((prev) => {
+                const newMsgs = [...prev];
+                newMsgs[newMsgs.length - 1].content = assistantText;
+                return newMsgs;
+              });
+            }
+
+            // 2. Stop loading state when stream explicitly completes
+            if (data.object === 'thread.message.completed') {
+              setLoading(false);
+            }
+          } catch (err) {
+            // Ignore malformed JSON chunks
+            console.error("Stream parse error:", err);
+          }
         }
       }
-    } catch (err) {
-      console.error("Diagnostic catch triggered:", err);
-
-      let displayError = err.message;
-
-      // 5. DIAGNOSTIC PARSER: Try to see if the error is our JSON diagnostic string
-      try {
-        const parsed = JSON.parse(err.message);
-        // If it's valid JSON, we format it beautifully for the user
-        displayError = JSON.stringify(parsed, null, 2);
-      } catch (e) {
-        // Not JSON, display the raw error message (e.g., "Network Error")
-      }
-
-      setMessages(prev => {
-        const newMsgs = [...prev];
-        const lastMsgIndex = newMsgs.length - 1;
-        newMsgs[lastMsgIndex] = {
-          ...newMsgs[lastMsgIndex],
-          content: `🛑 SYSTEM ERROR REPORT:\n\n${displayError}`
-        };
-        return newMsgs;
-      });
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error('Chat Error:', error);
+      setMessages((prev) => [...prev, { 
+        role: 'assistant', 
+        content: '⚠️ Error: Connection to Watsonx lost.' 
+      }]);
+      setLoading(false);
     }
   };
 
   return { messages, loading, sendMessage };
-}
+};
