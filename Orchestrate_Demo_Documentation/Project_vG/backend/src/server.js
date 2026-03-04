@@ -16,15 +16,22 @@ const app = express();
 
 app.use(express.json());
 
+// --- CRITICAL CODE ENGINE UPDATE ---
+// Tells Express it is behind the IBM Code Engine/Cloudflare proxy.
+// This is essential for 'secure' cookies to be passed correctly.
+app.set('trust proxy', 1); 
+
 // 1. Session & Passport Initialization
 app.use(session({
     secret: process.env.SESSION_SECRET || 'fallback-secret-12345',
-    resave: false,
-    saveUninitialized: false, // Changed to false for better session health
+    resave: true,               // Ensure session is saved back to the store
+    saveUninitialized: true,    // Required to establish session before OIDC redirect
+    name: 'watsonx_session',    // Custom name to prevent collisions
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: true,           // Code Engine uses HTTPS
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 
+        sameSite: 'lax',        // Necessary for OIDC redirect completion
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
 
@@ -44,14 +51,13 @@ passport.use('oidc', new Strategy({ client }, (tokenset, userinfo, done) => {
     return done(null, userinfo);
 }));
 
-// Critical: These must work for the session to be created
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
 // 3. Auth Routes
 app.get('/auth/login', passport.authenticate('oidc'));
 
-// Updated Callback with internal logging
+// Enhanced Callback with Diagnostic Logging
 app.get('/auth/callback', (req, res, next) => {
     passport.authenticate('oidc', (err, user, info) => {
         if (err) {
@@ -76,7 +82,7 @@ app.get('/auth/logout', (req, res, next) => {
     req.logout((err) => {
         if (err) return next(err);
         req.session.destroy(() => {
-            res.clearCookie('connect.sid');
+            res.clearCookie('watsonx_session');
             res.redirect('/');
         });
     });
@@ -113,6 +119,7 @@ app.post('/api/chat', protect, async (req, res) => {
 });
 
 // 5. Global Security Gate & Static Files
+// Forces authentication before any frontend files are served
 app.get('/', (req, res, next) => {
     if (!req.isAuthenticated()) return res.redirect('/auth/login');
     next();
@@ -126,4 +133,4 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Modular Server listening on port ${PORT}`));
