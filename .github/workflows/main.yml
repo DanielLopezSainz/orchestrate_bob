@@ -22,9 +22,10 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          # Point this to the folder containing your Dockerfile
+          # This points to the directory containing your backend and frontend folders
           context: ./Orchestrate_Demo_Documentation/Project_vG
+          # This points to the specific Dockerfile inside that folder
           file: ./Orchestrate_Demo_Documentation/Project_vG/Dockerfile
           push: true
-          # Updated image name as requested
+          # The image name you requested
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/ibm-orchestrate-demo:latest
