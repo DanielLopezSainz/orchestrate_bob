@@ -1,0 +1,64 @@
+.chat-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f4f4f4;
+
+  .message-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+
+    .message-row {
+      display: flex;
+      gap: 1rem;
+      max-width: 80%;
+
+      &.user {
+        align-self: flex-end;
+        flex-direction: row-reverse;
+        .content-bubble {
+          background-color: #0043ce; // IBM Blue 70
+          color: white;
+          border-radius: 1rem 1rem 0 1rem;
+        }
+      }
+
+      &.assistant {
+        align-self: flex-start;
+        .content-bubble {
+          background-color: #ffffff;
+          color: #161616;
+          border: 1px solid #e0e0e0;
+          border-radius: 1rem 1rem 1rem 0;
+        }
+      }
+
+      .content-bubble {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        white-space: pre-wrap;
+      }
+    }
+  }
+
+  .chat-input-container {
+    padding: 1rem 2rem 2rem 2rem;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    
+    .input-form {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-end;
+      
+      .cds--text-input-wrapper {
+        flex: 1;
+      }
+    }
+  }
+}
