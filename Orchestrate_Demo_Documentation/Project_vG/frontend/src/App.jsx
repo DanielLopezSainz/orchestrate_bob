@@ -1,4 +1,6 @@
 // frontend/src/App.jsx
+import './App.scss';
+
 import { ChatHeader } from './components/ChatHeader';
 import { ChatLayout } from './components/ChatLayout';
 import { MessageList } from './components/MessageList';
