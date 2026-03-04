@@ -18,13 +18,13 @@ app.use(express.json());
 
 // 1. Session & Passport Initialization
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'fallback-secret-use-env-in-prod',
+    secret: process.env.SESSION_SECRET || 'fallback-secret-12345',
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false, // Changed to false for better session health
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 24 * 60 * 60 * 1000 
     }
 }));
 
@@ -44,21 +44,39 @@ passport.use('oidc', new Strategy({ client }, (tokenset, userinfo, done) => {
     return done(null, userinfo);
 }));
 
+// Critical: These must work for the session to be created
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
 // 3. Auth Routes
 app.get('/auth/login', passport.authenticate('oidc'));
 
-app.get('/auth/callback', passport.authenticate('oidc', {
-    successRedirect: '/',
-    failureRedirect: '/auth/login',
-}));
+// Updated Callback with internal logging
+app.get('/auth/callback', (req, res, next) => {
+    passport.authenticate('oidc', (err, user, info) => {
+        if (err) {
+            console.error('OIDC Auth Error:', err);
+            return res.status(500).send(`Authentication Failed: ${err.message}`);
+        }
+        if (!user) {
+            console.error('No user found in callback:', info);
+            return res.redirect('/auth/login');
+        }
+        req.logIn(user, (loginErr) => {
+            if (loginErr) {
+                console.error('Login Session Error:', loginErr);
+                return res.status(500).send('Session Login Error');
+            }
+            return res.redirect('/');
+        });
+    })(req, res, next);
+});
 
 app.get('/auth/logout', (req, res, next) => {
     req.logout((err) => {
         if (err) return next(err);
         req.session.destroy(() => {
+            res.clearCookie('connect.sid');
             res.redirect('/');
         });
     });
@@ -74,10 +92,7 @@ app.post('/api/chat', protect, async (req, res) => {
             const ibmError = await response.text();
             return res.status(response.status).json({
                 error: 'Watsonx API Error',
-                status: response.status,
-                ibmRaw: ibmError,
-                threadId: threadId || 'NEW_THREAD',
-                sessionId: req.sessionID
+                ibmRaw: ibmError
             });
         }
 
@@ -92,35 +107,23 @@ app.post('/api/chat', protect, async (req, res) => {
             res.write(value);
         }
         res.end();
-
     } catch (error) {
-        res.status(500).json({
-            error: error.message,
-            diagnostic: 'SERVER_INTERNAL_CRASH',
-            sessionId: req.sessionID,
-            threadId: req.body.threadId || 'N/A'
-        });
+        res.status(500).json({ error: error.message });
     }
 });
 
 // 5. Global Security Gate & Static Files
-// This prevents unauthenticated users from seeing the UI at all
 app.get('/', (req, res, next) => {
-    if (!req.isAuthenticated()) {
-        return res.redirect('/auth/login');
-    }
+    if (!req.isAuthenticated()) return res.redirect('/auth/login');
     next();
 });
 
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Protect all other frontend routes (for React Router support)
 app.get('*', (req, res) => {
-    if (!req.isAuthenticated()) {
-        return res.redirect('/auth/login');
-    }
+    if (!req.isAuthenticated()) return res.redirect('/auth/login');
     res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🚀 Modular Server listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
