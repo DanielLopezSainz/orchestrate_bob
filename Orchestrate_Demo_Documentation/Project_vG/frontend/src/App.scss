@@ -1,39 +1,36 @@
 // frontend/src/App.scss
-@use '@carbon/react';
-@use '@carbon/type';
 
+// Core layout
 .chat-layout {
   display: flex;
   flex-direction: column;
   height: 100vh;
   width: 100vw;
-  background-color: react.$ui-01; // Carbon G10 Light Gray background
+  background-color: #f4f4f4; // Equivalent to $ui-01
 
-  // Fixes Issue A: Ensuring the list takes available space so input stays at bottom
   .message-list {
     flex: 1;
     overflow-y: auto;
-    padding: react.$spacing-07;
+    padding: 2rem;
     display: flex;
     flex-direction: column;
-    gap: react.$spacing-05;
+    gap: 1rem;
 
-    // Fixes Issue B: Dialogue bubbles and formatting
     .message-row {
       display: flex;
-      gap: react.$spacing-04;
+      gap: 1rem;
       max-width: 85%;
-      @include type.type-style('body-short-01');
+      font-family: 'IBM Plex Sans', sans-serif;
 
       &.user {
         align-self: flex-end;
         flex-direction: row-reverse;
         
         .content-bubble {
-          background-color: react.$interactive-01; // IBM Blue 60
-          color: react.$text-04; // White text
+          background-color: #0f62fe; // Carbon Blue 60
+          color: #ffffff;
           border-radius: 1rem 1rem 0 1rem;
-          padding: react.$spacing-04 react.$spacing-05;
+          padding: 0.75rem 1rem;
         }
       }
 
@@ -41,29 +38,26 @@
         align-self: flex-start;
         
         .content-bubble {
-          background-color: react.$ui-02; // Slightly darker gray for bot
-          color: react.$text-01;
-          border: 1px solid react.$ui-03;
+          background-color: #e0e0e0; // Carbon Gray 20
+          color: #161616;
           border-radius: 1rem 1rem 1rem 0;
-          padding: react.$spacing-04 react.$spacing-05;
-          white-space: pre-wrap; // Preserves formatting from Watsonx
+          padding: 0.75rem 1rem;
+          white-space: pre-wrap; 
         }
       }
     }
   }
 
-  // Ensures the input field is always visible and anchored to the bottom
   .chat-input-container {
-    background-color: react.$ui-01;
-    border-top: 1px solid react.$ui-03;
-    padding: react.$spacing-05 react.$spacing-07 react.$spacing-07 react.$spacing-07;
+    background-color: #ffffff;
+    border-top: 1px solid #e0e0e0;
+    padding: 1.5rem 2rem;
 
     .input-form {
       display: flex;
       align-items: flex-end;
-      gap: react.$spacing-03;
+      gap: 0.75rem;
 
-      // This ensures the TextInput expands to fill width
       .cds--text-input-wrapper {
         flex-grow: 1;
       }
