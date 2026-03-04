@@ -1,21 +1,23 @@
-FROM node:18-alpine AS build-stage
+# Stage 1: Build the Frontend (Using Node 20 for Vite 7 compatibility)
+FROM node:20-alpine AS build-stage
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
-FROM node:18-alpine
+# Stage 2: Setup the Backend
+FROM node:20-alpine
 WORKDIR /app
-# Install backend deps
 COPY backend/package*.json ./backend/
 RUN cd backend && npm install
 COPY backend/ ./backend/
 
-# FORCE CLEAN: Ensure the public folder is empty before copying new build
-RUN rm -rf /app/backend/public && mkdir -p /app/backend/public
+# Ensure the public folder is ready
+RUN mkdir -p /backend/public
 
-# Copy FROM the frontend WORKDIR to the backend public folder
+# Copy the build output from the correct path defined in vite.config.js
+# Since Vite puts them in ../backend/public relative to frontend/
 COPY --from=build-stage /app/backend/public /app/backend/public
 
 WORKDIR /app/backend
