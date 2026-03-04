@@ -1,0 +1,30 @@
+name: Build and Push to Docker Hub
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          # Point this to the folder containing your Dockerfile
+          context: ./Orchestrate_Demo_Documentation/Project_vG
+          file: ./Orchestrate_Demo_Documentation/Project_vG/Dockerfile
+          push: true
+          # Updated image name as requested
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ibm-orchestrate-demo:latest
