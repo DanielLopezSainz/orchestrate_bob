@@ -8,7 +8,7 @@ export const useChat = () => {
   const sendMessage = async (text) => {
     if (!text.trim()) return;
 
-    // Add user message to UI
+    // 1. Add User Message to UI
     const userMsg = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
@@ -17,20 +17,26 @@ export const useChat = () => {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, threadId }),
+        body: JSON.stringify({ 
+            message: text, 
+            threadId: threadId // Send existing threadId if we have one
+        }),
       });
 
       if (!response.ok) throw new Error('Failed to connect to backend');
 
-      // Capture Thread ID from headers for continuity
+      // 2. Capture and Save the Thread ID from Watsonx
       const xThreadId = response.headers.get('X-IBM-THREAD-ID');
-      if (xThreadId) setThreadId(xThreadId);
+      if (xThreadId && !threadId) {
+          console.log("🧵 New Thread Started:", xThreadId);
+          setThreadId(xThreadId);
+      }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantText = '';
 
-      // Add placeholder for the assistant response
+      // 3. Prepare Assistant Placeholder
       setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
       while (true) {
@@ -48,7 +54,6 @@ export const useChat = () => {
             const rawData = cleanLine.replace('data: ', '');
             const data = JSON.parse(rawData);
 
-            // 1. Update text as it streams in
             if (data.object === 'thread.message.delta' && data.choices[0].delta?.content) {
               assistantText += data.choices[0].delta.content;
               setMessages((prev) => {
@@ -58,12 +63,10 @@ export const useChat = () => {
               });
             }
 
-            // 2. Stop loading state when stream explicitly completes
             if (data.object === 'thread.message.completed') {
               setLoading(false);
             }
           } catch (err) {
-            // Ignore malformed JSON chunks
             console.error("Stream parse error:", err);
           }
         }
@@ -72,7 +75,7 @@ export const useChat = () => {
       console.error('Chat Error:', error);
       setMessages((prev) => [...prev, { 
         role: 'assistant', 
-        content: '⚠️ Error: Connection to Watsonx lost.' 
+        content: '⚠️ Connection Error: Conversation state lost.' 
       }]);
       setLoading(false);
     }
