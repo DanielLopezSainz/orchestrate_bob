@@ -8,7 +8,7 @@ export function ChatHeader() {
   return (
     <Header aria-label="Watsonx Agent">
       <HeaderName href="/" prefix="IBM">
-        Watsonx Orchestrate UI Demo
+        Watsonx Orchestrate UI - MODULAR-V2.1-LIVE
       </HeaderName>
       {/* Visual Version Indicator */}
       <div style={{ display: 'flex', alignItems: 'center', marginLeft: '1rem' }}>
