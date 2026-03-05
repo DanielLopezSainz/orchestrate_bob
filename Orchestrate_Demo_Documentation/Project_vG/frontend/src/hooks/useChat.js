@@ -1,5 +1,17 @@
 import { useState } from 'react';
 
+// Add this at the very top of the file
+console.log("🛠️ DEBUG: useChat Hook Loaded - Version 2.1-THREAD-FIX");
+
+// Inside sendMessage, right after receiving the header:
+const xThreadId = response.headers.get('X-IBM-THREAD-ID');
+if (xThreadId) {
+    console.log("🧵 THREAD SYNC SUCCESS:", xThreadId);
+    setThreadId(xThreadId);
+} else {
+    console.warn("⚠️ WARNING: No Thread ID received from server!");
+}
+
 export const useChat = () => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
