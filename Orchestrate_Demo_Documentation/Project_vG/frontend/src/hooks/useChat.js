@@ -1,16 +1,7 @@
 import { useState } from 'react';
 
-// Add this at the very top of the file
-console.log("🛠️ DEBUG: useChat Hook Loaded - Version 2.1-THREAD-FIX");
-
-// Inside sendMessage, right after receiving the header:
-const xThreadId = response.headers.get('X-IBM-THREAD-ID');
-if (xThreadId) {
-    console.log("🧵 THREAD SYNC SUCCESS:", xThreadId);
-    setThreadId(xThreadId);
-} else {
-    console.warn("⚠️ WARNING: No Thread ID received from server!");
-}
+// This confirms the file itself loaded
+console.log("%c 🛠️ DEBUG: useChat Hook Module Loaded - v2.1-THREAD-FIX", "background: #333; color: #bada55; padding: 5px;");
 
 export const useChat = () => {
   const [messages, setMessages] = useState([]);
@@ -20,7 +11,9 @@ export const useChat = () => {
   const sendMessage = async (text) => {
     if (!text.trim()) return;
 
-    // 1. Add User Message to UI
+    // DEBUG: Confirm what we are sending to the server
+    console.log(`%c 📤 Sending: "${text}" | Current ThreadID: ${threadId || 'NONE'}`, "color: #0f62fe; font-weight: bold;");
+
     const userMsg = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
@@ -31,24 +24,25 @@ export const useChat = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             message: text, 
-            threadId: threadId // Send existing threadId if we have one
+            threadId: threadId 
         }),
       });
 
       if (!response.ok) throw new Error('Failed to connect to backend');
 
-      // 2. Capture and Save the Thread ID from Watsonx
+      // 1. Capture and Save the Thread ID - Syncing State
       const xThreadId = response.headers.get('X-IBM-THREAD-ID');
-      if (xThreadId && !threadId) {
-          console.log("🧵 New Thread Started:", xThreadId);
+      if (xThreadId) {
+          console.log(`%c 🧵 THREAD SYNC: ${xThreadId}`, "color: #24a148; font-weight: bold;");
           setThreadId(xThreadId);
+      } else {
+          console.warn("⚠️ WARNING: No Thread ID returned from server headers.");
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantText = '';
 
-      // 3. Prepare Assistant Placeholder
       setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
       while (true) {
