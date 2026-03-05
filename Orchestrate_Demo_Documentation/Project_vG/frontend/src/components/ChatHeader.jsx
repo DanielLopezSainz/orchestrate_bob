@@ -1,24 +1,26 @@
-// frontend/src/components/ChatHeader.jsx
-import { Header, HeaderName, HeaderGlobalBar, HeaderGlobalAction, Tag } from '@carbon/react';
-import { Logout } from '@carbon/icons-react';
+import React, { useEffect, useState } from 'react';
+import { Header, HeaderName, Tag } from '@carbon/react';
 
-export function ChatHeader() {
-  const APP_VERSION = "v2.0-MODULAR-AUTH"; // Increment this for every push!
+export const ChatHeader = () => {
+    const [version, setVersion] = useState('Loading...');
 
-  return (
-    <Header aria-label="Watsonx Agent">
-      <HeaderName href="/" prefix="IBM">
-        Watsonx Orchestrate UI - MODULAR-V2.1-LIVE
-      </HeaderName>
-      {/* Visual Version Indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', marginLeft: '1rem' }}>
-        <Tag type="green" size="sm">{APP_VERSION}</Tag>
-      </div>
-      <HeaderGlobalBar>
-        <HeaderGlobalAction aria-label="Logout" onClick={() => window.location.href = '/auth/logout'}>
-          <Logout size={20} />
-        </HeaderGlobalAction>
-      </HeaderGlobalBar>
-    </Header>
-  );
-}
+    useEffect(() => {
+        fetch('/api/version')
+            .then(res => res.json())
+            .then(data => setVersion(data.version))
+            .catch(() => setVersion('v2.0-STATIC'));
+    }, []);
+
+    return (
+        <Header aria-label="IBM Watsonx UI">
+            <HeaderName href="#" prefix="IBM">
+                Watsonx Orchestrate UI Demo
+            </HeaderName>
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '1rem' }}>
+                <Tag type="green" size="sm" title="Build Version">
+                    {version}
+                </Tag>
+            </div>
+        </Header>
+    );
+};
