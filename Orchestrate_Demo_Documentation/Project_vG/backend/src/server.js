@@ -125,6 +125,15 @@ app.get('/', (req, res, next) => {
     next();
 });
 
+// Add this near the top of backend/src/server.js
+const APP_VERSION = "v2.1-BUILD-MAR05-01"; // Increment this manually each time
+
+app.get('/api/version', (req, res) => {
+    res.json({ version: APP_VERSION });
+});
+
+
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('*', (req, res) => {
