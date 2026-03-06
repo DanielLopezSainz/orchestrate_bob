@@ -3,7 +3,7 @@ import { Header, HeaderName, Tag } from '@carbon/react';
 
 export const ChatHeader = () => {
   // Update this string to match your GitHub Build Number (e.g., #31)
-  const CURRENT_BUILD = "v2.1-BUILD-31-FORCE-SYNC"; 
+  const CURRENT_BUILD = "v2.1-BUILD-35-FORCE-SYNC"; 
 
   return (
     <Header aria-label="IBM Watsonx UI">
