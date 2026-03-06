@@ -7,6 +7,7 @@ import { streamChat } from './clients/ibmClient.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import cors from 'cors';
 
 dotenv.config();
 
@@ -15,10 +16,18 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // --- VERSIONING & DEBUGGING ---
-// Update this string to match your build tracking
-const APP_VERSION = "v2.1-BUILD-33-FINAL-SYNC"; 
+// Incremented for the ThreadID Fix verification
+const APP_VERSION = "v2.1-BUILD-36-THREAD-SYNC"; 
 
 app.use(express.json());
+
+// 🟢 CRITICAL FOR CORS & THREAD PERSISTENCE
+// We must allow the frontend to see the custom IBM Thread header
+app.use(cors({
+    origin: true,
+    credentials: true,
+    exposedHeaders: ['X-IBM-THREAD-ID']
+}));
 
 // 🟢 CRITICAL FOR CODE ENGINE: Trust the proxy to allow secure cookies over HTTPS
 app.set('trust proxy', 1); 
@@ -91,7 +100,6 @@ app.post('/api/chat', protect, async (req, res) => {
     try {
         const { message, threadId } = req.body;
         
-        // Log incoming state for Code Engine log monitoring
         console.log(`[${APP_VERSION}] Req: "${message.substring(0, 20)}..." | ThreadID: ${threadId || 'NEW'}`);
 
         const response = await streamChat(message, threadId);
@@ -101,7 +109,12 @@ app.post('/api/chat', protect, async (req, res) => {
             return res.status(response.status).json({ error: 'Watsonx API Error', raw: ibmError });
         }
 
-        // 🟢 THE CRITICAL FIX: Extract the Thread ID and EXPOSE it to the frontend browser
+        /**
+         * 🟢 THE CRITICAL FIX: 
+         * 1. Extract the Thread ID from the IBM Watsonx response headers.
+         * 2. Expose it so the browser's Fetch API can read it.
+         * 3. Set it in the response header back to the frontend.
+         */
         const xThreadId = response.headers.get('X-IBM-THREAD-ID');
         if (xThreadId) {
             console.log(`[${APP_VERSION}] Thread Sync: ${xThreadId}`);
@@ -140,5 +153,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`🚀 [${APP_VERSION}] Modular Server active on port ${PORT}`);
+    console.log(`🚀 [${APP_VERSION}] Fully Modular Server active on port ${PORT}`);
 });
