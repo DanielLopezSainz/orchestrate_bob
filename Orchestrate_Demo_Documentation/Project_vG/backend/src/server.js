@@ -14,28 +14,33 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 
-// --- DEBUG VERSION MARKER ---
-const APP_VERSION = "v2.1-BUILD-MAR05-FINAL"; 
+// --- VERSIONING & DEBUGGING ---
+// Update this string to match your build tracking
+const APP_VERSION = "v2.1-BUILD-33-FINAL-SYNC"; 
 
 app.use(express.json());
+
+// 🟢 CRITICAL FOR CODE ENGINE: Trust the proxy to allow secure cookies over HTTPS
 app.set('trust proxy', 1); 
 
+// 1. Session & Passport Configuration
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'fallback-secret-12345',
+    secret: process.env.SESSION_SECRET || 'watsonx-demo-secret-string',
     resave: true,
     saveUninitialized: true,
     name: 'watsonx_session',
     cookie: {
-        secure: true,
+        secure: true,    // Required for IBM Code Engine HTTPS
         httpOnly: true,
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
 
+// 2. OIDC Strategy Setup (IBM ID / App ID)
 const ibmIssuer = await Issuer.discover(process.env.OIDC_DISCOVERY_URL);
 const client = new ibmIssuer.Client({
     client_id: process.env.OIDC_CLIENT_ID,
@@ -51,18 +56,21 @@ passport.use('oidc', new Strategy({ client }, (tokenset, userinfo, done) => {
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
-// 1. Version API
+// 3. Version API Endpoint
 app.get('/api/version', (req, res) => {
     res.json({ version: APP_VERSION });
 });
 
-// 2. Auth Routes
+// 4. Authentication Routes
 app.get('/auth/login', passport.authenticate('oidc'));
 app.get('/auth/callback', (req, res, next) => {
     passport.authenticate('oidc', (err, user, info) => {
-        if (err || !user) return res.redirect('/auth/login');
+        if (err || !user) {
+            console.error('Auth Error:', err || 'No user found');
+            return res.redirect('/auth/login');
+        }
         req.logIn(user, (loginErr) => {
-            if (loginErr) return res.status(500).send('Login Error');
+            if (loginErr) return res.status(500).send('Session Login Error');
             return res.redirect('/');
         });
     })(req, res, next);
@@ -78,28 +86,30 @@ app.get('/auth/logout', (req, res, next) => {
     });
 });
 
-// 3. Protected API Route (With Enhanced Debugging)
+// 5. Protected Chat API Route (Fixes Thread ID Persistence)
 app.post('/api/chat', protect, async (req, res) => {
     try {
         const { message, threadId } = req.body;
         
-        // DEBUG LOG: Critical to see if the frontend is persisting the ID
-        console.log(`[${APP_VERSION}] Incoming Request - ThreadID: ${threadId || 'NEW_CONVERSATION'}`);
+        // Log incoming state for Code Engine log monitoring
+        console.log(`[${APP_VERSION}] Req: "${message.substring(0, 20)}..." | ThreadID: ${threadId || 'NEW'}`);
 
         const response = await streamChat(message, threadId);
 
         if (!response.ok) {
             const ibmError = await response.text();
-            return res.status(response.status).json({ error: 'Watsonx API Error', ibmRaw: ibmError });
+            return res.status(response.status).json({ error: 'Watsonx API Error', raw: ibmError });
         }
 
+        // 🟢 THE CRITICAL FIX: Extract the Thread ID and EXPOSE it to the frontend browser
         const xThreadId = response.headers.get('X-IBM-THREAD-ID');
         if (xThreadId) {
+            console.log(`[${APP_VERSION}] Thread Sync: ${xThreadId}`);
+            res.setHeader('Access-Control-Expose-Headers', 'X-IBM-THREAD-ID');
             res.setHeader('X-IBM-THREAD-ID', xThreadId);
-            // DEBUG LOG: Confirming Watsonx accepted/assigned the thread
-            console.log(`[${APP_VERSION}] Outgoing Header - ThreadID: ${xThreadId}`);
         }
 
+        // Stream the response back to the client
         res.setHeader('Content-Type', 'text/event-stream');
         const reader = response.body.getReader();
         while (true) {
@@ -109,17 +119,18 @@ app.post('/api/chat', protect, async (req, res) => {
         }
         res.end();
     } catch (error) {
-        console.error('Chat Route Error:', error);
+        console.error('Chat processing error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// 4. Static Files & Security
+// 6. Static File Serving & Security Gate
 app.get('/', (req, res, next) => {
     if (!req.isAuthenticated()) return res.redirect('/auth/login');
     next();
 });
 
+// Pointing to the 'public' folder where Vite builds the frontend
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('*', (req, res) => {
@@ -128,4 +139,6 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🚀 [${APP_VERSION}] Server listening on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`🚀 [${APP_VERSION}] Modular Server active on port ${PORT}`);
+});
