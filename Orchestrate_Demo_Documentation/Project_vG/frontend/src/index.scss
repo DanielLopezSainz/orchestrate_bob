@@ -1,5 +1,7 @@
 // src/index.scss
-@use '@carbon/react';
+
+// Removed @use '@carbon/react' because it is already imported in App.scss. 
+// Duplicating it breaks styles and bloats the application.
 
 body, html, #root {
   height: 100%;
