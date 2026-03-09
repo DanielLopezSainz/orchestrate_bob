@@ -5,10 +5,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: [
-      // This tells Vite to resolve Webpack-style "~" imports to node_modules
-      { find: /^~(.+)/, replacement: '$1' }
-    ]
+    alias: {
+      // Direct, safe mappings for Carbon packages
+      '~@ibm': '@ibm',
+      '~@carbon': '@carbon'
+    }
   },
   build: {
     // This tells Vite to put the final GUI files in the backend's public folder
