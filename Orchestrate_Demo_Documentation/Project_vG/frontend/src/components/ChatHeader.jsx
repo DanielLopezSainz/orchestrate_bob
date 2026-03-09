@@ -1,8 +1,15 @@
+/**
+ * frontend/src/components/ChatHeader.jsx
+ * * ARCHITECTURE: DUMB COMPONENT
+ * AI AGENT NOTE: Do not add state or API logic here. This component only displays
+ * data passed via the config prop and a simple fetch for the backend version tag.
+ */
+
 import React, { useEffect, useState } from 'react';
 import { Header, HeaderName, HeaderGlobalBar, Tag } from '@carbon/react';
 
-export const ChatHeader = () => {
-  const FRONTEND_BUILD = "v2.5-UI-POLISH";
+export const ChatHeader = ({ config }) => {
+  const FRONTEND_BUILD = "v3.0-TEMPLATE";
   const [backendVersion, setBackendVersion] = useState("Loading...");
 
   useEffect(() => {
@@ -14,8 +21,8 @@ export const ChatHeader = () => {
 
   return (
     <Header aria-label="IBM Watsonx UI">
-      <HeaderName href="#" prefix="IBM">
-        Watsonx Orchestrate UI Demo
+      <HeaderName href="#" prefix={config.app.headerPrefix}>
+        {config.app.headerTitle}
       </HeaderName>
       <HeaderGlobalBar style={{ display: 'flex', alignItems: 'center', paddingRight: '1rem', gap: '0.5rem' }}>
         <Tag type="blue" size="sm" title="Frontend Build Version">
