@@ -1,7 +1,9 @@
 // frontend/src/index.scss
 
-// 1. Import the entire Carbon React styles globally
-@use '@carbon/react';
+// Tell Carbon NOT to bundle local fonts, preventing Vite pathing errors
+@use '@carbon/react' with (
+  $css--font-face: false
+);
 
 body, html, #root {
   height: 100%;
