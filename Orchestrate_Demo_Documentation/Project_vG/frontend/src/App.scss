@@ -1,4 +1,10 @@
-// frontend/src/App.scss
+/**
+ * frontend/src/App.scss
+ * * ARCHITECTURE: TEMPLATE STYLESHEET
+ * This file defines the structural layout and dynamic theme mapping for the chat interface.
+ * AI AGENT NOTE: Do not hardcode brand colors here. All colors map to --theme-* CSS variables 
+ * which are dynamically injected at runtime by App.jsx reading from config.json.
+ */
 
 .app-layout {
   height: 100vh;
@@ -21,7 +27,7 @@
   display: flex;
   flex-direction: column;
   padding: 0 !important;
-  margin-top: 3rem; /* Height of the fixed Carbon Header */
+  margin-top: 3rem; /* Offset for the fixed Carbon Header */
   height: calc(100vh - 3rem);
 }
 
@@ -45,8 +51,9 @@
     flex-direction: row-reverse; /* Puts the avatar on the right */
 
     .content-bubble {
-      background-color: #0f62fe; /* Carbon Blue 60 */
-      color: #ffffff;
+      /* Uses dynamic CSS variables injected from config.json */
+      background-color: var(--theme-user-bubble-bg, #0f62fe); 
+      color: var(--theme-user-bubble-text, #ffffff);
       border: none;
       border-radius: 8px 8px 0px 8px; /* Modern directional bubble */
     }
@@ -56,16 +63,16 @@
     align-self: flex-start;
 
     .content-bubble {
-      background-color: #ffffff;
-      color: #161616;
-      border: 1px solid #e0e0e0; /* Gray 20 */
+      background-color: var(--theme-assistant-bubble-bg, #ffffff);
+      color: var(--theme-assistant-bubble-text, #161616);
+      border: 1px solid var(--theme-assistant-bubble-border, #e0e0e0);
       border-radius: 8px 8px 8px 0px;
     }
   }
 
   &.thinking .content-bubble {
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
+    background-color: var(--theme-assistant-bubble-bg, #ffffff);
+    border: 1px solid var(--theme-assistant-bubble-border, #e0e0e0);
     border-radius: 8px 8px 8px 0px;
     display: flex;
     align-items: center;
@@ -74,7 +81,7 @@
 
 .content-bubble {
   padding: 1rem 1.25rem;
-  white-space: pre-wrap;
+  white-space: pre-wrap; /* Critical for streaming text formatting */
   line-height: 1.5;
   word-break: break-word;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -93,8 +100,8 @@
 }
 
 .user .icon-container {
-  background-color: #d0e2ff; 
-  color: #0f62fe;
+  background-color: var(--theme-user-icon-bg, #d0e2ff); 
+  color: var(--theme-user-icon-color, #0f62fe);
 }
 
 /* --- Chat Input Area --- */
@@ -120,7 +127,7 @@
 
   input.cds--text-input {
     width: 100%;
-    background-color: #f4f4f4; /* 🛡️ Makes the input visible against the white wrapper */
+    background-color: #f4f4f4; 
     border-bottom: 1px solid #8d8d8d;
   }
 }
