@@ -5,90 +5,112 @@ This project is a modular, template-ready web application designed to serve as t
 
 The primary goal of this repository is to act as a **reusable template**. It is built to be easily deployed across different customers and use cases with minimal code changes. The application utilizes the **IBM Carbon Design System** for its visual language and supports dynamic, configuration-driven theming.
 
-## Architectural Goals
-1. **Separation of Concerns:** Strict isolation between visual components, state logic, session memory, and external API integration.
-2. **Template Reusability:** UI colors, text, and branding are controlled via a central JSON configuration, completely independent of the React component logic.
-3. **Secure Conversational Memory:** The Thread ID (which gives the Watsonx agent its memory) is safely managed by the backend session layer to survive browser refreshes and OIDC redirects.
-4. **Streaming Native:** Built from the ground up to handle Server-Sent Events (SSE) to provide real-time, typewriter-effect responses from the AI.
-5. **Unified Deployment:** The frontend compiles directly into the backend's static directory, allowing a single Docker container to serve the entire application on platforms like IBM Code Engine.
+
+Rather than building a rigid, single-use application, this project was developed with a strict **Template Philosophy**. It is engineered to be instantly redeployable for different enterprise customers and distinct Watsonx agents by simply updating configuration files and environment variables—all while maintaining enterprise-grade security and Server-Sent Event (SSE) streaming capabilities.
 
 ---
 
-## Architecture & Layer Components
+## 🎯 Design Philosophy & Goals
 
-The application is divided into heavily abstracted layers. **🤖 AI AGENT DIRECTIVE:** When modifying this codebase, you must respect these boundaries. Do not mix layer responsibilities.
-
-### 1. Security & Authorization Layer (Backend)
-* **File:** `backend/src/middleware/auth.js`
-* **File:** `backend/src/server.js`
-* **Role:** Manages the OpenID Connect (OIDC) authentication flow (via Passport.js). Protects API endpoints and verifies that the authenticated user's email exists on the approved environment allowlist.
-
-### 2. Session State Layer (Backend)
-* **File:** `backend/src/server.js` (express-session configuration)
-* **Role:** Acts as the Single Source of Truth for the Watsonx `threadId`. It ensures the conversational context is bound to the user's secure cookie, preventing "amnesia" if the React app reloads.
-
-### 3. External API Integration Layer (Backend)
-* **File:** `backend/src/clients/ibmClient.js`
-* **File:** `backend/src/services/iam.js`
-* **Role:** Manages IBM Cloud IAM token fetching, caching, and expiration buffers. Proxies the incoming prompt to the Watsonx Orchestrate API.
-* **🤖 AI AGENT DIRECTIVE:** The `streamChat` function must *only* return the raw fetch Promise. Do not await `.json()` or `.text()`, as this breaks the SSE streaming pipeline.
-
-### 4. State & Logic Layer (Frontend)
-* **File:** `frontend/src/hooks/useChat.js`
-* **Role:** The engine of the frontend. It manages the chat array, parses incoming Server-Sent Events (buffering incomplete chunks), extracts the `thread_id` from the Watsonx JSON payload, and syncs it back to the backend session.
-
-### 5. Presentation & Theming Layer (Frontend)
-* **File:** `frontend/src/config.json` (Central theme configuration)
-* **File:** `frontend/src/App.scss` (Template CSS using CSS Variables)
-* **Files:** `frontend/src/components/*.jsx`
-* **Role:** "Dumb" components built with `@carbon/react`. They do not fetch data. They simply render the state provided by `useChat.js` and consume the colors/text defined in `config.json`.
+1. **Strict Separation of Concerns:** The codebase is heavily layered. UI components do not fetch data, API clients do not parse UI state, and the frontend is blissfully unaware of authentication secrets.
+2. **Configuration-Driven Theming:** UI colors, typography, and branding text are decoupled from React components. A central `config.json` acts as the single source of truth for the application's visual identity.
+3. **Secure Conversational Memory:** The application uses the Backend-for-Frontend (BFF) pattern. Conversational context (the Watsonx `thread_id`) is locked inside a secure backend `express-session`, preventing the AI from losing its memory when the user refreshes the browser or triggers an OIDC redirect.
+4. **Streaming Native:** Built specifically to handle Server-Sent Events (SSE). It pipes the raw binary stream from Watsonx directly to the client browser to create a real-time, typewriter-effect response.
+5. **Unified Cloud-Native Deployment:** Designed specifically for serverless container platforms like IBM Code Engine. It packages the compiled frontend and the Node.js API gateway into a single, high-performance Docker image.
 
 ---
 
-## Customization Guide (For Developers & AI Agents)
+## 🔄 How it Works: The Watsonx Integration Flow
+Because we cannot expose IBM Cloud API keys directly to the browser, the application uses a secure backend proxy pattern. Here is the exact lifecycle of a chat message:
 
-Because this is a template, most customizations should require minimal effort. Here are examples of how to modify the application for a new customer deployment:
+1. **Input:** The user types a message in the React UI (`ChatInput.jsx`).
+2. **Hook Execution:** `useChat.js` dispatches the prompt via HTTP POST to our local Express server (`/api/chat`).
+3. **Auth & Session Sync:** The Express server (`server.js`) verifies the user's OIDC session and retrieves the active `threadId` from `express-session` to ensure the agent remembers the context.
+4. **IAM Authentication:** `iam.js` fetches (or retrieves from memory) a valid IBM Cloud IAM token.
+5. **Watsonx Request:** `ibmClient.js` forwards the prompt, the IAM token, and the `X-IBM-THREAD-ID` to the Watsonx Orchestrate API. It strictly requests `stream: true`.
+6. **Streaming Proxy:** Watsonx responds with an SSE stream. Express takes this raw stream and pipes it directly back to the React frontend without consuming it.
+7. **Frontend Parsing:** `useChat.js` reads the chunks, utilizes a string buffer to reconstruct split JSON payloads, extracts the `thread_id` to sync back to the server, and incrementally updates the UI with the text delta.
 
-### Scenario A: Changing the UI Theme and Branding
-**Goal:** Deploy the app for "Customer X" who wants a red theme and a custom assistant name.
-**Action:** 1. Do not modify React components.
-2. Open `frontend/src/config.json`.
-3. Update `app.headerTitle` to "Customer X Orchestrate".
-4. Update `app.assistantName` to "Support Bot".
-5. Update `theme.userBubbleBackground` to `#da1e28` (Carbon Red 60).
-6. Rebuild the frontend (`npm run build`).
+---
 
-### Scenario B: Migrating to a different Identity Provider (e.g., Microsoft Entra ID)
-**Goal:** Move away from IBM App ID to a standard corporate Microsoft Entra OIDC login.
-**Action:**
-1. Update the `.env` file with the new `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`. The `openid-client` library in `server.js` will automatically adapt to the new discovery document.
-2. Open `backend/src/middleware/auth.js`.
-3. Inspect the new ID Token payload structure. If Microsoft uses a different key for the user's email (e.g., `upn` or `mail`), update the extraction logic:
-   ```javascript
-   // Change from:
-   const userEmail = req.user.email || req.user.preferred_username;
-   // To:
-   const userEmail = req.user.email || req.user.preferred_username || req.user.upn;
+## 🏗️ Architecture Layers & Customization Guide
 
-### Scenario C: Customizing the Chat Layout Structure
-**Goal:** A UI designer has provided a totally new HTML/CSS layout for the chat interface that differs structurally from the default Carbon layout.
-**Action:**
+To maintain the template's integrity, modifications must respect the established layer boundaries.
 
-You may replace the JSX inside MessageList.jsx and ChatInput.jsx with the designer's HTML/React export.
+### 1. Presentation Layer (Frontend UI)
+* **Components:** `frontend/src/components/*.jsx`
+* **Theming:** `frontend/src/config.json` & `frontend/src/App.scss`
+* **Role:** "Dumb" components built with the IBM Carbon Design System (`@carbon/react`). 
+* **How to Modify:** * **To Change Branding:** Do not rewrite components. Open `config.json` and change the text/hex colors. The app dynamically injects these into `App.scss` as CSS Custom Properties.
+  * **To Change Layout:** You may replace the JSX within the components to match a custom Figma design, but you must pass the `messages` array via props. **Never** add `fetch()` calls or business logic to these files.
 
-Constraint: You must continue to map the messages array from useChat.js to the new layout. Do not move the fetch() logic into the new UI components.
+### 2. State & Logic Layer (Frontend Hook)
+* **Component:** `frontend/src/hooks/useChat.js`
+* **Role:** The engine of the frontend. Manages the chat array, handles loading states, and executes the complex SSE buffer-and-parse logic.
+* **How to Modify:**
+  * You can safely add new state variables here (e.g., `const [isTyping, setIsTyping] = useState(false)`) and pass them down to the UI components.
+  * **WARNING:** Never remove the string buffering logic (`buffer += decoder.decode...`). TCP streams arbitrarily split JSON payloads in transit. If you attempt to run `JSON.parse()` on unbuffered chunks, the application will crash.
 
-### Deployment
-This application is designed to be deployed as a single Docker container.
+### 3. Security & Session Layer (Backend Middleware)
+* **Components:** `backend/src/server.js`, `backend/src/middleware/auth.js`
+* **Role:** Manages OpenID Connect (OIDC) authentication via Passport.js, enforces allowlist authorization, and manages the secure `express-session`.
+* **How to Modify:**
+  * **To change Identity Providers (e.g., moving to Microsoft Entra ID):** Update the `OIDC_*` environment variables. Then, open `auth.js` and ensure the email extraction logic matches the new provider's token schema (e.g., checking `req.user.upn` instead of `req.user.email`).
 
-The Dockerfile uses a multi-stage build.
+### 4. External API Integration Layer (Backend Clients)
+* **Components:** `backend/src/clients/ibmClient.js`, `backend/src/services/iam.js`
+* **Role:** Generates IBM Cloud IAM tokens and communicates with the Watsonx REST API.
+* **How to Modify:**
+  * **To add custom tracking headers:** Modify the `headers` object inside `ibmClient.js`.
+  * **WARNING:** In `ibmClient.js`, the `streamChat` function must **only** return the raw `fetch` promise. Do not `await response.json()`. Awaiting the response consumes the body and destroys the SSE streaming pipeline. Never bypass the IAM caching logic in `iam.js`, or the app will be rate-limited by IBM.
 
-* **Stage 1:** compiles the Vite React app.
+---
 
-* **Stage 2:** copies the compiled assets directly into the Express backend's public directory.
+## ⚙️ Environment Variables
 
-Express serves the static UI and hosts the secure /api and /auth endpoints on the same port (default 8080).
+To run this application locally or deploy it to the cloud, configure the following environment variables in a `.env` file located in the `/backend` directory.
 
+### Watsonx & IAM Configuration
+| Variable | Description |
+| :--- | :--- |
+| `API_KEY` | Your IBM Cloud API Key (used to generate IAM Bearer tokens). |
+| `ORCHESTRATE_INSTANCE_URL` | The base URL for your Watsonx instance (e.g., `https://api.watsonx.ai`). |
+| `AGENT_ID` | The specific UUID of the Watsonx Orchestrate agent to route chats to. |
 
+### Authentication (OIDC)
+| Variable | Description |
+| :--- | :--- |
+| `OIDC_DISCOVERY_URL` | The well-known configuration endpoint for your IDP (e.g., IBM App ID or Entra). |
+| `OIDC_CLIENT_ID` | The application's registered client ID. |
+| `OIDC_CLIENT_SECRET` | The application's registered client secret. |
+| `OIDC_REDIRECT_URI` | The authorized callback URL (e.g., `http://localhost:8080/auth/callback` for dev, or your real domain for prod). |
 
-🤖 AI AGENT DIRECTIVE: Do not alter the outDir in vite.config.js or the static asset routing in server.js without updating the COPY directives in the Dockerfile.
+### Security & Server Config
+| Variable | Description |
+| :--- | :--- |
+| `ALLOWED_USERS` | A comma-separated list of email addresses authorized to access the application. |
+| `SESSION_SECRET` | A strong cryptographic string used to sign the secure session cookies. |
+| `PORT` | The port the Express server listens on (Defaults to `8080`). |
+
+---
+
+## 🐳 Docker & Code Engine Deployment
+
+This application is architected specifically for serverless container platforms like **IBM Code Engine**. To simplify networking, eliminate CORS complexities, and reduce cloud costs, it is packaged as a **Single Unified Container**.
+
+### How the Multi-Stage Dockerfile Works:
+1. **Stage 1 (Frontend Build):** The Dockerfile spins up a Node.js Alpine container, installs the frontend dependencies, and runs `vite build`. 
+2. **Path Synchronization:** Vite is explicitly configured via `vite.config.js` to output the compiled, minified HTML/CSS/JS assets directly into a specific folder: `/app/backend/public`.
+3. **Stage 2 (Backend Production):** A fresh, lightweight Node container is created. It installs *only* production dependencies for the backend. It then uses the `COPY --from=build-stage` command to pull the `/public` folder generated in Stage 1 into the backend directory.
+4. **Unified Gateway:** The Express backend spins up on port `8080`. It intercepts `/api` and `/auth` routes natively, and acts as a static file server for anything else, thereby serving the React SPA.
+
+**The Result:** You get a full-stack, authenticated application running in a single, easily deployable Docker image. You do not need to configure separate frontend and backend deployments, nor do you need to maintain an NGINX proxy container.
+
+### Deployment Commands
+
+```bash
+# 1. Build the unified image
+docker build -t watsonx-ui-template .
+
+# 2. Run locally to test the production build (Make sure your .env is populated)
+docker run -p 8080:8080 --env-file ./backend/.env watsonx-ui-template
