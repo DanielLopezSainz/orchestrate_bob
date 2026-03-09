@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 // This confirms the file itself loaded
-console.log("%c 🛠️ DEBUG: useChat Hook Module Loaded - v2.1-THREAD-FIX", "background: #333; color: #bada55; padding: 5px;");
+console.log("%c 🛠️ DEBUG: useChat Hook Module Loaded - v2.2-THREAD-SYNC-FIX", "background: #333; color: #bada55; padding: 5px;");
 
 export const useChat = () => {
   const [messages, setMessages] = useState([]);
@@ -12,7 +12,7 @@ export const useChat = () => {
     if (!text.trim()) return;
 
     // DEBUG: Confirm what we are sending to the server
-    console.log(`%c 📤 Sending: "${text}" | Current ThreadID: ${threadId || 'NONE'}`, "color: #0f62fe; font-weight: bold;");
+    console.log(`%c 📤 Sending: "${text}" | Current Frontend ThreadID: ${threadId || 'Waiting for Session Sync...'}`, "color: #0f62fe; font-weight: bold;");
 
     const userMsg = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
@@ -30,10 +30,10 @@ export const useChat = () => {
 
       if (!response.ok) throw new Error('Failed to connect to backend');
 
-      // 1. Capture and Save the Thread ID - Syncing State
+      // 1. Capture and Save the Thread ID - Syncing State with the Backend Session
       const xThreadId = response.headers.get('X-IBM-THREAD-ID');
       if (xThreadId) {
-          console.log(`%c 🧵 THREAD SYNC: ${xThreadId}`, "color: #24a148; font-weight: bold;");
+          console.log(`%c 🧵 THREAD SYNC SUCCESS: ${xThreadId}`, "color: #24a148; font-weight: bold;");
           setThreadId(xThreadId);
       } else {
           console.warn("⚠️ WARNING: No Thread ID returned from server headers.");
@@ -58,6 +58,10 @@ export const useChat = () => {
 
           try {
             const rawData = cleanLine.replace('data: ', '');
+            
+            // Ignore the [DONE] signal from Orchestrate
+            if (rawData === '[DONE]') continue;
+
             const data = JSON.parse(rawData);
 
             if (data.object === 'thread.message.delta' && data.choices[0].delta?.content) {
@@ -73,7 +77,8 @@ export const useChat = () => {
               setLoading(false);
             }
           } catch (err) {
-            console.error("Stream parse error:", err);
+             // We will address the chunk-splitting JSON parse error when we tackle the UI rendering bug
+             // console.warn("Stream parse incomplete chunk:", err);
           }
         }
       }
@@ -81,8 +86,9 @@ export const useChat = () => {
       console.error('Chat Error:', error);
       setMessages((prev) => [...prev, { 
         role: 'assistant', 
-        content: '⚠️ Connection Error: Conversation state lost.' 
+        content: '⚠️ Connection Error: Failed to communicate with Watsonx.' 
       }]);
+    } finally {
       setLoading(false);
     }
   };
