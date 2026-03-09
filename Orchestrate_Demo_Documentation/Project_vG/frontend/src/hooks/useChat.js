@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
-// This confirms the file itself loaded
-console.log("%c 🛠️ DEBUG: useChat Hook Module Loaded - v2.2-THREAD-SYNC-FIX", "background: #333; color: #bada55; padding: 5px;");
+console.log("%c 🛠️ DEBUG: useChat Hook Module Loaded - v2.3-SSE-THREAD-FIX", "background: #333; color: #bada55; padding: 5px;");
 
 export const useChat = () => {
   const [messages, setMessages] = useState([]);
@@ -11,84 +10,87 @@ export const useChat = () => {
   const sendMessage = async (text) => {
     if (!text.trim()) return;
 
-    // DEBUG: Confirm what we are sending to the server
-    console.log(`%c 📤 Sending: "${text}" | Current Frontend ThreadID: ${threadId || 'Waiting for Session Sync...'}`, "color: #0f62fe; font-weight: bold;");
+    console.log(`%c 📤 Sending: "${text}" | Current Frontend ThreadID: ${threadId || 'Waiting for stream payload...'}`, "color: #0f62fe; font-weight: bold;");
 
     const userMsg = { role: 'user', content: text };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg, { role: 'assistant', content: '' }]);
     setLoading(true);
 
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            message: text, 
-            threadId: threadId 
-        }),
+        body: JSON.stringify({ message: text, threadId }),
       });
 
       if (!response.ok) throw new Error('Failed to connect to backend');
 
-      // 1. Capture and Save the Thread ID - Syncing State with the Backend Session
-      const xThreadId = response.headers.get('X-IBM-THREAD-ID');
-      if (xThreadId) {
-          console.log(`%c 🧵 THREAD SYNC SUCCESS: ${xThreadId}`, "color: #24a148; font-weight: bold;");
-          setThreadId(xThreadId);
-      } else {
-          console.warn("⚠️ WARNING: No Thread ID returned from server headers.");
-      }
-
       const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let assistantText = '';
-
-      setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
+      const decoder = new TextDecoder('utf-8');
+      
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || ''; 
 
-        for (const line of lines) {
-          const cleanLine = line.trim();
-          if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
+        for (const part of parts) {
+          const lines = part.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6).trim();
+              
+              if (dataStr === '[DONE]') {
+                  setLoading(false);
+                  continue;
+              }
 
-          try {
-            const rawData = cleanLine.replace('data: ', '');
-            
-            // Ignore the [DONE] signal from Orchestrate
-            if (rawData === '[DONE]') continue;
+              try {
+                const data = JSON.parse(dataStr);
+                
+                // ✨ THE ROOT FIX: Extract Thread ID directly from the Watsonx JSON payload
+                if (data.thread_id) {
+                    setThreadId(prevThreadId => {
+                        if (prevThreadId !== data.thread_id) {
+                            console.log(`%c 🧵 THREAD EXTRACTED FROM STREAM: ${data.thread_id}`, "color: #24a148; font-weight: bold;");
+                        }
+                        return data.thread_id;
+                    });
+                }
 
-            const data = JSON.parse(rawData);
+                const delta = data.choices?.[0]?.delta?.content || '';
 
-            if (data.object === 'thread.message.delta' && data.choices[0].delta?.content) {
-              assistantText += data.choices[0].delta.content;
-              setMessages((prev) => {
-                const newMsgs = [...prev];
-                newMsgs[newMsgs.length - 1].content = assistantText;
-                return newMsgs;
-              });
+                if (delta) {
+                  setMessages((prev) => {
+                    const newMsgs = [...prev];
+                    const lastIndex = newMsgs.length - 1;
+                    newMsgs[lastIndex] = {
+                      ...newMsgs[lastIndex],
+                      content: newMsgs[lastIndex].content + delta
+                    };
+                    return newMsgs;
+                  });
+                }
+              } catch (err) {
+                 // Ignore incomplete JSON chunks until fully buffered
+              }
             }
-
-            if (data.object === 'thread.message.completed') {
-              setLoading(false);
-            }
-          } catch (err) {
-             // We will address the chunk-splitting JSON parse error when we tackle the UI rendering bug
-             // console.warn("Stream parse incomplete chunk:", err);
           }
         }
       }
+      setLoading(false);
     } catch (error) {
       console.error('Chat Error:', error);
-      setMessages((prev) => [...prev, { 
-        role: 'assistant', 
-        content: '⚠️ Connection Error: Failed to communicate with Watsonx.' 
-      }]);
-    } finally {
+      setMessages((prev) => {
+          const newMsgs = [...prev];
+          newMsgs[newMsgs.length - 1].content = '⚠️ Connection Error: Failed to communicate with Watsonx.';
+          return newMsgs;
+      });
       setLoading(false);
     }
   };
