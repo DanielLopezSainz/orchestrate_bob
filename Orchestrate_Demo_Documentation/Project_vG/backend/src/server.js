@@ -16,8 +16,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // --- VERSIONING TOKEN ---
-// This will be displayed in the UI to confirm Code Engine updated successfully
-const APP_VERSION = "v2.3-SSE-THREAD-FIX"; 
+const APP_VERSION = "v2.4-UI-ROUTING-FIX"; 
 
 app.use(express.json());
 
@@ -61,7 +60,7 @@ passport.use('oidc', new Strategy({ client }, (tokenset, userinfo, done) => {
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
-// 3. Version API Endpoint (Requested token to verify deployment)
+// 3. Version API Endpoint 
 app.get('/api/version', (req, res) => {
     res.json({ version: APP_VERSION });
 });
@@ -91,18 +90,16 @@ app.get('/auth/logout', (req, res, next) => {
     });
 });
 
-// 5. Protected Chat API Route (Fixes Thread ID Persistence)
+// 5. Protected Chat API Route 
 app.post('/api/chat', protect, async (req, res) => {
     try {
         let activeThreadId = req.body.threadId;
 
-        // BI-DIRECTIONAL SYNC: Ensure frontend and backend agree on the active thread
+        // BI-DIRECTIONAL SYNC
         if (activeThreadId) {
-            // Frontend learned the Thread ID from the stream payload, save it to session
             req.session.threadId = activeThreadId;
             req.session.save();
         } else if (req.session.threadId) {
-            // Frontend lost the Thread ID (e.g., page refresh), inject from session
             activeThreadId = req.session.threadId;
         }
 
@@ -138,6 +135,11 @@ app.get('/', (req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, '../public')));
+
+// 🛡️ UI BUG FIX: Prevent Express from serving index.html for missing static assets
+app.use('/assets', (req, res) => {
+    res.status(404).send('Asset Not Found');
+});
 
 app.get('*', (req, res) => {
     if (!req.isAuthenticated()) return res.redirect('/auth/login');
