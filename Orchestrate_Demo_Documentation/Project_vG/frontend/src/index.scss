@@ -1,11 +1,14 @@
-// src/index.scss
+// frontend/src/index.scss
 
-// Removed @use '@carbon/react' because it is already imported in App.scss. 
-// Duplicating it breaks styles and bloats the application.
+// 1. Import the entire Carbon React styles globally
+@use '@carbon/react';
 
 body, html, #root {
   height: 100%;
   margin: 0;
   font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
-  background-color: #f4f4f4; /* Carbon's standard background */
+  background-color: var(--cds-background, #f4f4f4);
+  color: var(--cds-text-primary, #161616);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
