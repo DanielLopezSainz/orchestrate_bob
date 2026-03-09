@@ -1,4 +1,3 @@
-// frontend/src/components/ChatLayout.jsx
 import { Content, Theme } from '@carbon/react';
 
 export function ChatLayout({ children }) {
@@ -9,9 +8,10 @@ export function ChatLayout({ children }) {
         width: '100vw',
         display: 'flex',
         flexDirection: 'column',
-        padding: 0, // Removes default Carbon padding that pushes content away
+        padding: 0,
+        paddingTop: '3rem', // 🛡️ Fixes the overlap by clearing the 48px Header
         margin: 0,
-        overflow: 'hidden', // Prevents the whole page from scrolling
+        overflow: 'hidden', 
         backgroundColor: '#f4f4f4'
       }}>
         {children}
