@@ -1,0 +1,19 @@
+{
+  "app": {
+    "headerPrefix": "IBM",
+    "headerTitle": "Watsonx Orchestrate UI Demo",
+    "welcomeMessage": "Start a conversation with your Watsonx Agent.",
+    "inputPlaceholder": "Ask Watsonx...",
+    "assistantName": "Agent",
+    "userName": "You"
+  },
+  "theme": {
+    "userBubbleBackground": "#0f62fe",
+    "userBubbleText": "#ffffff",
+    "userIconBackground": "#d0e2ff",
+    "userIconColor": "#0f62fe",
+    "assistantBubbleBackground": "#ffffff",
+    "assistantBubbleText": "#161616",
+    "assistantBubbleBorder": "#e0e0e0"
+  }
+}
