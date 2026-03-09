@@ -1,20 +1,30 @@
-import React from 'react';
-import { Header, HeaderName, Tag } from '@carbon/react';
+import React, { useEffect, useState } from 'react';
+import { Header, HeaderName, HeaderGlobalBar, Tag } from '@carbon/react';
 
 export const ChatHeader = () => {
-  // Update this string to match your GitHub Build Number (e.g., #31)
-  const CURRENT_BUILD = "v2.1-BUILD-35-FORCE-SYNC"; 
+  const FRONTEND_BUILD = "v2.5-UI-POLISH";
+  const [backendVersion, setBackendVersion] = useState("Loading...");
+
+  useEffect(() => {
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(data => setBackendVersion(data.version))
+      .catch(() => setBackendVersion("Unknown Backend"));
+  }, []);
 
   return (
     <Header aria-label="IBM Watsonx UI">
       <HeaderName href="#" prefix="IBM">
         Watsonx Orchestrate UI Demo
       </HeaderName>
-      <div style={{ display: 'flex', alignItems: 'center', marginLeft: '1rem' }}>
-        <Tag type="green" size="sm">
-          {CURRENT_BUILD}
+      <HeaderGlobalBar style={{ display: 'flex', alignItems: 'center', paddingRight: '1rem', gap: '0.5rem' }}>
+        <Tag type="blue" size="sm" title="Frontend Build Version">
+          UI: {FRONTEND_BUILD}
         </Tag>
-      </div>
+        <Tag type="green" size="sm" title="Backend Server Version">
+          API: {backendVersion}
+        </Tag>
+      </HeaderGlobalBar>
     </Header>
   );
 };
