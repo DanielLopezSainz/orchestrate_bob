@@ -1,3 +1,13 @@
+/**
+ * backend/src/server.js
+ * * ARCHITECTURE: MODULAR BACKEND GATEWAY
+ * This server acts as a secure proxy between the React frontend and IBM Watsonx.
+ * * CORE RESPONSIBILITIES (By AI Agent Directives):
+ * 1. LAYER 1: Authentication (OIDC/Passport) - Manages identity verification via IBM App ID/Entra.
+ * 2. LAYER 2: Session State (express-session) - Secures the Thread ID to prevent frontend amnesia.
+ * 3. LAYER 3: Proxy (SSE) - Pipes raw Server-Sent Events from Watsonx directly to React.
+ */
+
 import express from 'express';
 import session from 'express-session';
 import passport from 'passport';
@@ -15,19 +25,24 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 
-// --- VERSIONING TOKEN ---
-const APP_VERSION = "v2.4-UI-ROUTING-FIX"; 
+const APP_VERSION = "v3.0-TEMPLATE-API"; 
 
 app.use(express.json());
 
+// CORS configuration allows the frontend to inspect custom tracking headers
 app.use(cors({
     origin: true,
-    credentials: true
+    credentials: true,
+    exposedHeaders: ['X-IBM-THREAD-ID']
 }));
 
+// Trust Proxy is required for express-session to accept 'secure: true' cookies when 
+// deployed behind IBM Code Engine's load balancers.
 app.set('trust proxy', 1); 
 
-// 1. Session Configuration
+// --- LAYER 2: SESSION MANAGEMENT ---
+// AI AGENT NOTE: This session holds the Watsonx Thread ID. Do not rely on React to 
+// hold the Thread ID across page reloads.
 app.use(session({
     secret: process.env.SESSION_SECRET || 'watsonx-demo-secret-string',
     resave: true,
@@ -44,7 +59,9 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 2. OIDC Strategy Setup
+// --- LAYER 1: AUTHENTICATION (OIDC) ---
+// Agnostic OIDC implementation. To switch to Microsoft Entra or Auth0, simply 
+// change the OIDC_* environment variables. No code changes required here.
 const ibmIssuer = await Issuer.discover(process.env.OIDC_DISCOVERY_URL);
 const client = new ibmIssuer.Client({
     client_id: process.env.OIDC_CLIENT_ID,
@@ -60,12 +77,10 @@ passport.use('oidc', new Strategy({ client }, (tokenset, userinfo, done) => {
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
-// 3. Version API Endpoint 
 app.get('/api/version', (req, res) => {
     res.json({ version: APP_VERSION });
 });
 
-// 4. Authentication Routes
 app.get('/auth/login', passport.authenticate('oidc'));
 app.get('/auth/callback', (req, res, next) => {
     passport.authenticate('oidc', (err, user, info) => {
@@ -90,12 +105,14 @@ app.get('/auth/logout', (req, res, next) => {
     });
 });
 
-// 5. Protected Chat API Route 
+// --- LAYER 3: PROXY AND SSE STREAMING ---
 app.post('/api/chat', protect, async (req, res) => {
     try {
         let activeThreadId = req.body.threadId;
 
-        // BI-DIRECTIONAL SYNC
+        // BI-DIRECTIONAL THREAD SYNC
+        // 1. If React sends a thread ID, it learned it from the stream payload. Save it.
+        // 2. If React sends null, it lost its state. Inject the ID from the secure session.
         if (activeThreadId) {
             req.session.threadId = activeThreadId;
             req.session.save();
@@ -104,9 +121,6 @@ app.post('/api/chat', protect, async (req, res) => {
         }
 
         const { message } = req.body;
-        
-        console.log(`[${APP_VERSION}] Req: "${message.substring(0, 20)}..." | ThreadID: ${activeThreadId || 'NEW'}`);
-
         const response = await streamChat(message, activeThreadId);
 
         if (!response.ok) {
@@ -114,7 +128,12 @@ app.post('/api/chat', protect, async (req, res) => {
             return res.status(response.status).json({ error: 'Watsonx API Error', raw: ibmError });
         }
 
+        // Establish the SSE connection headers for the React frontend
         res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // Pipe the binary stream directly from IBM to the client browser
         const reader = response.body.getReader();
         while (true) {
             const { done, value } = await reader.read();
@@ -128,7 +147,7 @@ app.post('/api/chat', protect, async (req, res) => {
     }
 });
 
-// 6. Static File Serving & Security Gate
+// --- STATIC ROUTING ---
 app.get('/', (req, res, next) => {
     if (!req.isAuthenticated()) return res.redirect('/auth/login');
     next();
@@ -136,11 +155,12 @@ app.get('/', (req, res, next) => {
 
 app.use(express.static(path.join(__dirname, '../public')));
 
-// 🛡️ UI BUG FIX: Prevent Express from serving index.html for missing static assets
+// Fallback to prevent HTML serving for missing Vite assets (e.g., fonts, images)
 app.use('/assets', (req, res) => {
     res.status(404).send('Asset Not Found');
 });
 
+// Catch-all route to support React Router inside the SPA
 app.get('*', (req, res) => {
     if (!req.isAuthenticated()) return res.redirect('/auth/login');
     res.sendFile(path.join(__dirname, '../public/index.html'));
