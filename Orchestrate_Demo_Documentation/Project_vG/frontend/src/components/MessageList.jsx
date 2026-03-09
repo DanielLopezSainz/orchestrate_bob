@@ -11,6 +11,12 @@ export const MessageList = ({ messages, isLoading }) => {
 
   return (
     <div className="message-list">
+      {messages.length === 0 && (
+        <p style={{ color: '#525252', textAlign: 'center', marginTop: '3rem' }}>
+          Start a conversation with your Watsonx Agent.
+        </p>
+      )}
+
       {messages.map((msg, i) => (
         <div key={i} className={`message-row ${msg.role}`}>
           <div className="icon-container">
