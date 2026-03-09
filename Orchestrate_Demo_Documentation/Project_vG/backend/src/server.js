@@ -15,41 +15,37 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 
-// --- VERSIONING & DEBUGGING ---
-const APP_VERSION = "v2.2-THREAD-SYNC-FIX"; 
+// --- VERSIONING TOKEN ---
+// This will be displayed in the UI to confirm Code Engine updated successfully
+const APP_VERSION = "v2.3-SSE-THREAD-FIX"; 
 
 app.use(express.json());
 
-// 🟢 CRITICAL FOR CORS & THREAD PERSISTENCE
 app.use(cors({
     origin: true,
-    credentials: true,
-    exposedHeaders: ['X-IBM-THREAD-ID']
+    credentials: true
 }));
 
-// 🟢 CRITICAL FOR CODE ENGINE: Trust the proxy to allow secure cookies over HTTPS
 app.set('trust proxy', 1); 
 
-// 1. Session & Passport Configuration
-// Modular design: Session handles state, Passport/OIDC handles Auth
+// 1. Session Configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || 'watsonx-demo-secret-string',
     resave: true,
     saveUninitialized: true,
     name: 'watsonx_session',
     cookie: {
-        // secure must be false for local HTTP dev, but true for Code Engine HTTPS
         secure: process.env.NODE_ENV === 'production', 
         httpOnly: true,
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 24 * 60 * 60 * 1000 
     }
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 2. OIDC Strategy Setup 
+// 2. OIDC Strategy Setup
 const ibmIssuer = await Issuer.discover(process.env.OIDC_DISCOVERY_URL);
 const client = new ibmIssuer.Client({
     client_id: process.env.OIDC_CLIENT_ID,
@@ -65,7 +61,7 @@ passport.use('oidc', new Strategy({ client }, (tokenset, userinfo, done) => {
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
-// 3. Version API Endpoint
+// 3. Version API Endpoint (Requested token to verify deployment)
 app.get('/api/version', (req, res) => {
     res.json({ version: APP_VERSION });
 });
@@ -98,35 +94,29 @@ app.get('/auth/logout', (req, res, next) => {
 // 5. Protected Chat API Route (Fixes Thread ID Persistence)
 app.post('/api/chat', protect, async (req, res) => {
     try {
-        // ARCHITECTURE FIX: The Session layer now acts as the source of truth.
-        // If the frontend loses the threadId due to a refresh, we pull it from the secure session.
-        const threadId = req.session.threadId || req.body.threadId;
+        let activeThreadId = req.body.threadId;
+
+        // BI-DIRECTIONAL SYNC: Ensure frontend and backend agree on the active thread
+        if (activeThreadId) {
+            // Frontend learned the Thread ID from the stream payload, save it to session
+            req.session.threadId = activeThreadId;
+            req.session.save();
+        } else if (req.session.threadId) {
+            // Frontend lost the Thread ID (e.g., page refresh), inject from session
+            activeThreadId = req.session.threadId;
+        }
+
         const { message } = req.body;
         
-        console.log(`[${APP_VERSION}] Req: "${message.substring(0, 20)}..." | ThreadID: ${threadId || 'NEW'}`);
+        console.log(`[${APP_VERSION}] Req: "${message.substring(0, 20)}..." | ThreadID: ${activeThreadId || 'NEW'}`);
 
-        const response = await streamChat(message, threadId);
+        const response = await streamChat(message, activeThreadId);
 
         if (!response.ok) {
             const ibmError = await response.text();
             return res.status(response.status).json({ error: 'Watsonx API Error', raw: ibmError });
         }
 
-        // Extract the Thread ID from IBM Watsonx response headers
-        const xThreadId = response.headers.get('X-IBM-THREAD-ID');
-        if (xThreadId) {
-            console.log(`[${APP_VERSION}] Thread Sync: ${xThreadId}`);
-            
-            // Persist the Thread ID to the user's secure session
-            req.session.threadId = xThreadId;
-            req.session.save();
-
-            // Expose it so the browser's Fetch API can sync it
-            res.setHeader('Access-Control-Expose-Headers', 'X-IBM-THREAD-ID');
-            res.setHeader('X-IBM-THREAD-ID', xThreadId);
-        }
-
-        // Stream the response back to the client
         res.setHeader('Content-Type', 'text/event-stream');
         const reader = response.body.getReader();
         while (true) {
@@ -147,7 +137,6 @@ app.get('/', (req, res, next) => {
     next();
 });
 
-// Pointing to the 'public' folder where Vite builds the frontend
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('*', (req, res) => {
