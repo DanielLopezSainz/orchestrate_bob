@@ -1,6 +1,15 @@
-import { useState } from 'react';
+/**
+ * frontend/src/hooks/useChat.js
+ * * ARCHITECTURE: STATE & LOGIC LAYER (CUSTOM HOOK)
+ * AI AGENT NOTE: All communication with the Watsonx backend, Server-Sent Events (SSE) 
+ * parsing, and Thread state management MUST remain in this file. UI components are 
+ * strictly forbidden from making network requests.
+ * * CRITICAL FLOW:
+ * 1. Stream reading must use a buffer to assemble JSON chunks safely.
+ * 2. The Thread ID must be extracted from the inner JSON payload, NOT from HTTP headers.
+ */
 
-console.log("%c 🛠️ DEBUG: useChat Hook Module Loaded - v2.3-SSE-THREAD-FIX", "background: #333; color: #bada55; padding: 5px;");
+import { useState } from 'react';
 
 export const useChat = () => {
   const [messages, setMessages] = useState([]);
@@ -10,8 +19,7 @@ export const useChat = () => {
   const sendMessage = async (text) => {
     if (!text.trim()) return;
 
-    console.log(`%c 📤 Sending: "${text}" | Current Frontend ThreadID: ${threadId || 'Waiting for stream payload...'}`, "color: #0f62fe; font-weight: bold;");
-
+    // Push the user's message and a blank assistant placeholder to the UI immediately
     const userMsg = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg, { role: 'assistant', content: '' }]);
     setLoading(true);
@@ -20,6 +28,7 @@ export const useChat = () => {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // Send the threadId to the backend. If it's null, backend will check its session.
         body: JSON.stringify({ message: text, threadId }),
       });
 
@@ -28,6 +37,7 @@ export const useChat = () => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       
+      // BUFFER: Required because TCP streams split JSON payloads arbitrarily.
       let buffer = '';
 
       while (true) {
@@ -36,7 +46,10 @@ export const useChat = () => {
 
         buffer += decoder.decode(value, { stream: true });
         
+        // SSE standard uses double newline to mark the end of a complete event chunk
         const parts = buffer.split('\n\n');
+        
+        // Pop the last element back into the buffer, as it might be an incomplete chunk
         buffer = parts.pop() || ''; 
 
         for (const part of parts) {
@@ -53,22 +66,26 @@ export const useChat = () => {
               try {
                 const data = JSON.parse(dataStr);
                 
-                // ✨ THE ROOT FIX: Extract Thread ID directly from the Watsonx JSON payload
+                // --- THREAD ID EXTRACTION ---
+                // Watsonx streams do not put thread_ids in the HTTP headers. They are 
+                // embedded inside the data payload. We must capture it here to maintain context.
                 if (data.thread_id) {
                     setThreadId(prevThreadId => {
                         if (prevThreadId !== data.thread_id) {
-                            console.log(`%c 🧵 THREAD EXTRACTED FROM STREAM: ${data.thread_id}`, "color: #24a148; font-weight: bold;");
+                            console.log(`[useChat] Thread Extracted: ${data.thread_id}`);
                         }
                         return data.thread_id;
                     });
                 }
 
+                // Extract the specific text delta from the Orchestrate choices array
                 const delta = data.choices?.[0]?.delta?.content || '';
 
                 if (delta) {
                   setMessages((prev) => {
                     const newMsgs = [...prev];
                     const lastIndex = newMsgs.length - 1;
+                    // Append the delta to the existing assistant placeholder string
                     newMsgs[lastIndex] = {
                       ...newMsgs[lastIndex],
                       content: newMsgs[lastIndex].content + delta
@@ -77,7 +94,8 @@ export const useChat = () => {
                   });
                 }
               } catch (err) {
-                 // Ignore incomplete JSON chunks until fully buffered
+                 // Silently ignore JSON parse errors here. If a chunk was split, the next 
+                 // cycle will append the rest of the string to the buffer and parse successfully.
               }
             }
           }
