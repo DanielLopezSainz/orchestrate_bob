@@ -16,13 +16,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // --- VERSIONING & DEBUGGING ---
-// Incremented for the ThreadID Fix verification
-const APP_VERSION = "v2.1-BUILD-36-THREAD-SYNC"; 
+const APP_VERSION = "v2.2-THREAD-SYNC-FIX"; 
 
 app.use(express.json());
 
 // 🟢 CRITICAL FOR CORS & THREAD PERSISTENCE
-// We must allow the frontend to see the custom IBM Thread header
 app.use(cors({
     origin: true,
     credentials: true,
@@ -33,13 +31,15 @@ app.use(cors({
 app.set('trust proxy', 1); 
 
 // 1. Session & Passport Configuration
+// Modular design: Session handles state, Passport/OIDC handles Auth
 app.use(session({
     secret: process.env.SESSION_SECRET || 'watsonx-demo-secret-string',
     resave: true,
     saveUninitialized: true,
     name: 'watsonx_session',
     cookie: {
-        secure: true,    // Required for IBM Code Engine HTTPS
+        // secure must be false for local HTTP dev, but true for Code Engine HTTPS
+        secure: process.env.NODE_ENV === 'production', 
         httpOnly: true,
         sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
@@ -49,7 +49,7 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 2. OIDC Strategy Setup (IBM ID / App ID)
+// 2. OIDC Strategy Setup 
 const ibmIssuer = await Issuer.discover(process.env.OIDC_DISCOVERY_URL);
 const client = new ibmIssuer.Client({
     client_id: process.env.OIDC_CLIENT_ID,
@@ -98,7 +98,10 @@ app.get('/auth/logout', (req, res, next) => {
 // 5. Protected Chat API Route (Fixes Thread ID Persistence)
 app.post('/api/chat', protect, async (req, res) => {
     try {
-        const { message, threadId } = req.body;
+        // ARCHITECTURE FIX: The Session layer now acts as the source of truth.
+        // If the frontend loses the threadId due to a refresh, we pull it from the secure session.
+        const threadId = req.session.threadId || req.body.threadId;
+        const { message } = req.body;
         
         console.log(`[${APP_VERSION}] Req: "${message.substring(0, 20)}..." | ThreadID: ${threadId || 'NEW'}`);
 
@@ -109,15 +112,16 @@ app.post('/api/chat', protect, async (req, res) => {
             return res.status(response.status).json({ error: 'Watsonx API Error', raw: ibmError });
         }
 
-        /**
-         * 🟢 THE CRITICAL FIX: 
-         * 1. Extract the Thread ID from the IBM Watsonx response headers.
-         * 2. Expose it so the browser's Fetch API can read it.
-         * 3. Set it in the response header back to the frontend.
-         */
+        // Extract the Thread ID from IBM Watsonx response headers
         const xThreadId = response.headers.get('X-IBM-THREAD-ID');
         if (xThreadId) {
             console.log(`[${APP_VERSION}] Thread Sync: ${xThreadId}`);
+            
+            // Persist the Thread ID to the user's secure session
+            req.session.threadId = xThreadId;
+            req.session.save();
+
+            // Expose it so the browser's Fetch API can sync it
             res.setHeader('Access-Control-Expose-Headers', 'X-IBM-THREAD-ID');
             res.setHeader('X-IBM-THREAD-ID', xThreadId);
         }
