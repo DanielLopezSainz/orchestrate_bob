@@ -1,7 +1,4 @@
-// frontend/src/App.jsx
 import './App.scss';
-
-import { ChatHeader } from './components/ChatHeader';
 import { ChatLayout } from './components/ChatLayout';
 import { MessageList } from './components/MessageList';
 import { ChatInput } from './components/ChatInput';
@@ -12,7 +9,6 @@ function App() {
 
   return (
     <ChatLayout>
-      <ChatHeader />
       <MessageList messages={messages} isLoading={loading} />
       <ChatInput onSend={sendMessage} disabled={loading} />
     </ChatLayout>
