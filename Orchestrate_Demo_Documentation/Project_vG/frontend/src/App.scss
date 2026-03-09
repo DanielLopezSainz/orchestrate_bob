@@ -1,47 +1,38 @@
-// 1. Load the Carbon configuration and feature-flag module
-@use '@carbon/styles/scss/config' as *;
+// frontend/src/App.scss
 
-// 2. Set feature flags and variables globally 
-$fallback-fonts: true;
-
-// 3. Import the main Carbon React styles
-@use '@carbon/react';
-
-// 4. Custom Application Styles
-:root {
-  --cds-body-01-font-size: 0.875rem;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: var(--cds-background, #ffffff);
-  color: var(--cds-text-primary, #161616);
-}
-
-.app-container {
+.app-layout {
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
 
-// Ensure Carbon components use the full width where appropriate
-.cds--grid {
-  max-width: 100%;
+.app-main-theme {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--cds-background, #f4f4f4);
 }
 
-// --- Chat UI Template Styles ---
+.app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  margin-top: 3rem; /* Height of the fixed Carbon Header */
+  height: calc(100vh - 3rem);
+}
 
+/* --- Chat Message Area --- */
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 2rem 10%; /* Centers the chat slightly on wide screens */
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .message-row {
@@ -51,46 +42,83 @@ body {
 
   &.user {
     align-self: flex-end;
-    flex-direction: row-reverse; // Puts the user icon on the right side
-    
+    flex-direction: row-reverse; /* Puts the avatar on the right */
+
     .content-bubble {
-      background-color: #0f62fe; // Carbon Blue 60
+      background-color: #0f62fe; /* Carbon Blue 60 */
       color: #ffffff;
       border: none;
+      border-radius: 8px 8px 0px 8px; /* Modern directional bubble */
     }
   }
 
   &.assistant {
     align-self: flex-start;
-    
+
     .content-bubble {
       background-color: #ffffff;
       color: #161616;
-      border: 1px solid #e0e0e0;
+      border: 1px solid #e0e0e0; /* Gray 20 */
+      border-radius: 8px 8px 8px 0px;
     }
   }
 
-  &.thinking {
-    align-self: flex-start;
-    
-    .content-bubble {
-      background-color: #ffffff;
-      border: 1px solid #e0e0e0;
-      display: flex;
-      align-items: center;
-    }
+  &.thinking .content-bubble {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px 8px 8px 0px;
+    display: flex;
+    align-items: center;
   }
 }
 
 .content-bubble {
-  padding: 1rem;
-  border-radius: 4px;
-  white-space: pre-wrap; // Ensures streaming text line breaks are respected
+  padding: 1rem 1.25rem;
+  white-space: pre-wrap;
   line-height: 1.5;
   word-break: break-word;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .icon-container {
-  padding-top: 0.125rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0;
+}
+
+.user .icon-container {
+  background-color: #d0e2ff; 
+  color: #0f62fe;
+}
+
+/* --- Chat Input Area --- */
+.chat-input-wrapper {
+  background-color: #ffffff;
+  border-top: 1px solid #e0e0e0;
+  padding: 1.5rem 10%;
+}
+
+.chat-input-form {
+  display: flex;
+  gap: 1rem;
+  max-width: 64rem;
+  margin: 0 auto;
+  align-items: flex-end;
+
+  /* Force Carbon TextInput to consume remaining space */
+  .cds--text-input__field-wrapper,
+  .cds--text-input-wrapper {
+    flex: 1;
+    width: 100%;
+  }
+
+  input.cds--text-input {
+    width: 100%;
+  }
 }
