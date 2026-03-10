@@ -2,9 +2,13 @@
  * frontend/src/App.scss
  * * ARCHITECTURE: TEMPLATE STYLESHEET
  * This file defines the structural layout and dynamic theme mapping for the chat interface.
- * AI AGENT NOTE: Do not hardcode brand colors here. All colors map to --theme-* CSS variables 
+ * AI AGENT NOTE: Do not hardcode brand colors here. All colors map to --theme-* CSS variables
  * which are dynamically injected at runtime by App.jsx reading from config.json.
  */
+
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
 
 .app-layout {
   height: 100vh;
@@ -19,7 +23,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: var(--cds-background, #f4f4f4);
+  background-color: $background;
 }
 
 .app-content {
@@ -27,23 +31,23 @@
   display: flex;
   flex-direction: column;
   padding: 0 !important;
-  margin-top: 3rem; /* Offset for the fixed Carbon Header */
-  height: calc(100vh - 3rem);
+  margin-top: $spacing-09; /* Offset for the fixed Carbon Header (48px) */
+  height: calc(100vh - #{$spacing-09});
 }
 
 /* --- Chat Message Area --- */
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem 10%; /* Centers the chat slightly on wide screens */
+  padding: $spacing-07 10%; /* Centers the chat slightly on wide screens */
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: $spacing-06;
 }
 
 .message-row {
   display: flex;
-  gap: 1rem;
+  gap: $spacing-05;
   max-width: 85%;
 
   &.user {
@@ -52,10 +56,10 @@
 
     .content-bubble {
       /* Uses dynamic CSS variables injected from config.json */
-      background-color: var(--theme-user-bubble-bg, #0f62fe); 
-      color: var(--theme-user-bubble-text, #ffffff);
+      background-color: var(--theme-user-bubble-bg, $interactive);
+      color: var(--theme-user-bubble-text, $text-on-color);
       border: none;
-      border-radius: 8px 8px 0px 8px; /* Modern directional bubble */
+      border-radius: $spacing-03 $spacing-03 0 $spacing-03;
     }
   }
 
@@ -63,35 +67,35 @@
     align-self: flex-start;
 
     .content-bubble {
-      background-color: var(--theme-assistant-bubble-bg, #ffffff);
-      color: var(--theme-assistant-bubble-text, #161616);
-      border: 1px solid var(--theme-assistant-bubble-border, #e0e0e0);
-      border-radius: 8px 8px 8px 0px;
+      background-color: var(--theme-assistant-bubble-bg, $layer-01);
+      color: var(--theme-assistant-bubble-text, $text-primary);
+      border: 1px solid var(--theme-assistant-bubble-border, $border-subtle);
+      border-radius: $spacing-03 $spacing-03 $spacing-03 0;
     }
   }
 
   &.thinking .content-bubble {
-    background-color: var(--theme-assistant-bubble-bg, #ffffff);
-    border: 1px solid var(--theme-assistant-bubble-border, #e0e0e0);
-    border-radius: 8px 8px 8px 0px;
+    background-color: var(--theme-assistant-bubble-bg, $layer-01);
+    border: 1px solid var(--theme-assistant-bubble-border, $border-subtle);
+    border-radius: $spacing-03 $spacing-03 $spacing-03 0;
     display: flex;
     align-items: center;
   }
 }
 
 .content-bubble {
-  padding: 1rem 1.25rem;
+  padding: $spacing-05 $spacing-05;
   white-space: pre-wrap; /* Critical for streaming text formatting */
-  line-height: 1.5;
+  @include type-style('body-compact-01');
   word-break: break-word;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .icon-container {
-  width: 32px;
-  height: 32px;
+  width: $spacing-07;
+  height: $spacing-07;
   border-radius: 50%;
-  background-color: #e0e0e0;
+  background-color: $layer-accent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -100,20 +104,20 @@
 }
 
 .user .icon-container {
-  background-color: var(--theme-user-icon-bg, #d0e2ff); 
-  color: var(--theme-user-icon-color, #0f62fe);
+  background-color: var(--theme-user-icon-bg, $background-brand);
+  color: var(--theme-user-icon-color, $icon-on-color);
 }
 
 /* --- Chat Input Area --- */
 .chat-input-wrapper {
-  background-color: #ffffff;
-  border-top: 1px solid #e0e0e0;
-  padding: 1.5rem 10%;
+  background-color: $layer;
+  border-top: 1px solid $border-subtle;
+  padding: $spacing-06 10%;
 }
 
 .chat-input-form {
   display: flex;
-  gap: 1rem;
+  gap: $spacing-05;
   max-width: 64rem;
   margin: 0 auto;
   align-items: flex-end;
@@ -127,7 +131,72 @@
 
   input.cds--text-input {
     width: 100%;
-    background-color: #f4f4f4; 
-    border-bottom: 1px solid #8d8d8d;
+    background-color: $field;
+    border-bottom: 1px solid $border-strong;
+  }
+}
+
+/* --- Chat History Panel Styles --- */
+.chat-history-panel {
+  .history-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-09;
+    color: $text-secondary;
+    gap: $spacing-05;
+
+    svg {
+      fill: $icon-secondary;
+    }
+
+    p {
+      @include type-style('body-compact-01');
+      text-align: center;
+    }
+  }
+
+  .history-list-item {
+    cursor: pointer;
+    transition: background-color 70ms cubic-bezier(0, 0, 0.38, 0.9);
+
+    &:hover {
+      background-color: $layer-hover;
+    }
+
+    &:active {
+      background-color: $layer-active;
+    }
+  }
+
+  .history-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-03;
+    padding: $spacing-03 0;
+  }
+
+  .history-item-preview {
+    @include type-style('body-compact-01');
+    color: $text-primary;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .history-item-meta {
+    display: flex;
+    gap: $spacing-05;
+    @include type-style('label-01');
+    color: $text-secondary;
+  }
+
+  .history-item-time {
+    flex-shrink: 0;
+  }
+
+  .history-item-count {
+    flex-shrink: 0;
   }
 }

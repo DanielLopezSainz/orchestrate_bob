@@ -9,15 +9,103 @@
  * 2. The Thread ID must be extracted from the inner JSON payload, NOT from HTTP headers.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+const HISTORY_STORAGE_KEY = 'watsonx_chat_history';
+const MAX_HISTORY_ITEMS = 50;
 
 export const useChat = () => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [threadId, setThreadId] = useState(null);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
+
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setChatHistory(parsed);
+      }
+    } catch (error) {
+      console.error('[useChat] Failed to load chat history:', error);
+    }
+  }, []);
+
+  // Save chat history to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(chatHistory));
+    } catch (error) {
+      console.error('[useChat] Failed to save chat history:', error);
+    }
+  }, [chatHistory]);
+
+  // Save current conversation to history when messages change
+  useEffect(() => {
+    if (messages.length > 0 && currentChatId) {
+      const userMessages = messages.filter(m => m.role === 'user');
+      if (userMessages.length > 0) {
+        const firstMessage = userMessages[0].content;
+        const preview = firstMessage.length > 50
+          ? firstMessage.substring(0, 50) + '...'
+          : firstMessage;
+        
+        setChatHistory(prev => {
+          const existingIndex = prev.findIndex(item => item.id === currentChatId);
+          const historyItem = {
+            id: currentChatId,
+            preview,
+            firstMessage,
+            timestamp: existingIndex >= 0 ? prev[existingIndex].timestamp : Date.now(),
+            messageCount: messages.length
+          };
+
+          if (existingIndex >= 0) {
+            // Update existing item
+            const updated = [...prev];
+            updated[existingIndex] = historyItem;
+            return updated;
+          } else {
+            // Add new item at the beginning
+            const updated = [historyItem, ...prev];
+            // Keep only MAX_HISTORY_ITEMS
+            return updated.slice(0, MAX_HISTORY_ITEMS);
+          }
+        });
+      }
+    }
+  }, [messages, currentChatId]);
+
+  const startNewChat = () => {
+    setMessages([]);
+    setThreadId(null);
+    setCurrentChatId(`chat_${Date.now()}`);
+  };
+
+  const loadHistoryItem = (historyItem) => {
+    // Start a new chat and send the first message from history
+    setMessages([]);
+    setThreadId(null);
+    setCurrentChatId(historyItem.id);
+    // Send the original first message
+    sendMessage(historyItem.firstMessage);
+  };
+
+  const clearHistory = () => {
+    setChatHistory([]);
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
+  };
 
   const sendMessage = async (text) => {
     if (!text.trim()) return;
+
+    // Initialize chat ID if this is the first message
+    if (!currentChatId) {
+      setCurrentChatId(`chat_${Date.now()}`);
+    }
 
     // Push the user's message and a blank assistant placeholder to the UI immediately
     const userMsg = { role: 'user', content: text };
@@ -113,5 +201,14 @@ export const useChat = () => {
     }
   };
 
-  return { messages, loading, sendMessage };
+  return {
+    messages,
+    loading,
+    sendMessage,
+    chatHistory,
+    startNewChat,
+    loadHistoryItem,
+    clearHistory,
+    currentChatId
+  };
 };

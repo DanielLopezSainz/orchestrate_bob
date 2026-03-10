@@ -6,9 +6,10 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Header, HeaderName, HeaderGlobalBar, Tag } from '@carbon/react';
+import { Header, HeaderName, HeaderGlobalBar, HeaderGlobalAction, Tag } from '@carbon/react';
+import { History } from '@carbon/icons-react';
 
-export const ChatHeader = ({ config }) => {
+export const ChatHeader = ({ config, onToggleHistory }) => {
   const FRONTEND_BUILD = "v3.0-TEMPLATE";
   const [backendVersion, setBackendVersion] = useState("Loading...");
 
@@ -24,13 +25,22 @@ export const ChatHeader = ({ config }) => {
       <HeaderName href="#" prefix={config.app.headerPrefix}>
         {config.app.headerTitle}
       </HeaderName>
-      <HeaderGlobalBar style={{ display: 'flex', alignItems: 'center', paddingRight: '1rem', gap: '0.5rem' }}>
-        <Tag type="blue" size="sm" title="Frontend Build Version">
-          UI: {FRONTEND_BUILD}
-        </Tag>
-        <Tag type="green" size="sm" title="Backend Server Version">
-          API: {backendVersion}
-        </Tag>
+      <HeaderGlobalBar>
+        <HeaderGlobalAction
+          aria-label="Chat History"
+          tooltipAlignment="end"
+          onClick={onToggleHistory}
+        >
+          <History size={20} />
+        </HeaderGlobalAction>
+        <div style={{ display: 'flex', alignItems: 'center', paddingRight: '1rem', gap: '0.5rem' }}>
+          <Tag type="blue" size="sm" title="Frontend Build Version">
+            UI: {FRONTEND_BUILD}
+          </Tag>
+          <Tag type="green" size="sm" title="Backend Server Version">
+            API: {backendVersion}
+          </Tag>
+        </div>
       </HeaderGlobalBar>
     </Header>
   );

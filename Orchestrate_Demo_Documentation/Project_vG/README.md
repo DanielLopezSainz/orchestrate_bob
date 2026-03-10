@@ -1,4 +1,4 @@
-# IBM Watsonx Orchestrate UI Template
+# IBM Watsonx Orchestrate UI Template test edit from BOB
 
 ## Project Overview
 This project is a modular, template-ready web application designed to serve as the frontend and secure proxy backend for **IBM Watsonx Orchestrate** agents. 
@@ -8,7 +8,7 @@ The primary goal of this repository is to act as a **reusable template**. It is 
 
 Rather than building a rigid, single-use application, this project was developed with a strict **Template Philosophy**. It is engineered to be instantly redeployable for different enterprise customers and distinct Watsonx agents by simply updating configuration files and environment variables—all while maintaining enterprise-grade security and Server-Sent Event (SSE) streaming capabilities.
 
----
+--- 
 
 ## 🎯 Design Philosophy & Goals
 

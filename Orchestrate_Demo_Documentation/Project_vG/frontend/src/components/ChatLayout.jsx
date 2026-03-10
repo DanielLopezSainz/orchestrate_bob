@@ -7,14 +7,35 @@
 
 import { Content, Theme } from '@carbon/react';
 import { ChatHeader } from './ChatHeader';
+import { ChatHistoryPanel } from './ChatHistoryPanel';
 
-export function ChatLayout({ children, config }) {
+export function ChatLayout({
+  children,
+  config,
+  historyOpen,
+  onToggleHistory,
+  chatHistory,
+  onSelectHistory,
+  onNewChat,
+  onClearHistory
+}) {
   return (
     <div className="app-layout">
       {/* Dark Theme for standard Carbon Shell Header */}
       <Theme theme="g100">
-        <ChatHeader config={config} />
+        <ChatHeader config={config} onToggleHistory={onToggleHistory} />
       </Theme>
+      
+      {/* Chat History Panel */}
+      <ChatHistoryPanel
+        open={historyOpen}
+        onClose={onToggleHistory}
+        chatHistory={chatHistory}
+        onSelectHistory={onSelectHistory}
+        onNewChat={onNewChat}
+        onClearHistory={onClearHistory}
+        config={config}
+      />
       
       {/* Light Theme for the Chat Canvas */}
       <Theme theme="g10" className="app-main-theme">

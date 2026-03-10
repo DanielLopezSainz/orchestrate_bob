@@ -5,7 +5,10 @@
     "welcomeMessage": "Start a conversation with your Watsonx Agent.",
     "inputPlaceholder": "Ask Watsonx...",
     "assistantName": "Agent",
-    "userName": "You"
+    "userName": "You",
+    "historyPanelTitle": "Chat History",
+    "historyEmptyMessage": "No chat history yet",
+    "newChatButton": "New Chat"
   },
   "theme": {
     "userBubbleBackground": "#0f62fe",
