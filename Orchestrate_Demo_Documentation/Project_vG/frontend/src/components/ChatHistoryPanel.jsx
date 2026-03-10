@@ -15,7 +15,9 @@ import {
   StructuredListCell,
   Button
 } from '@carbon/react';
-import { History, Add, TrashCan } from '@carbon/icons-react';
+import History from '@carbon/icons-react/lib/History';
+import Add from '@carbon/icons-react/lib/Add';
+import TrashCan from '@carbon/icons-react/lib/TrashCan';
 
 export const ChatHistoryPanel = ({ 
   open, 

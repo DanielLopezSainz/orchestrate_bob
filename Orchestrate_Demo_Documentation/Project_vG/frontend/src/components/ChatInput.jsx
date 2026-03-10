@@ -8,7 +8,7 @@
 
 import { useState } from 'react';
 import { TextInput, Button } from '@carbon/react';
-import { Send } from '@carbon/icons-react';
+import Send from '@carbon/icons-react/lib/Send';
 
 export function ChatInput({ onSend, disabled, config }) {
   const [text, setText] = useState('');
