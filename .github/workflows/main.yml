@@ -28,5 +28,5 @@ jobs:
           push: true
           # We use the run_number to create a unique tag every time
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/ibm-orchestrate-demo:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/ibm-orchestrate-demo:build-${{ github.run_number }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ibm-orchestrate-bob:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/ibm-orchestrate-bob:build-${{ github.run_number }}
