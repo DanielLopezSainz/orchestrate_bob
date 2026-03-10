@@ -15,9 +15,7 @@ import {
   StructuredListCell,
   Button
 } from '@carbon/react';
-import History from '@carbon/icons-react/lib/History';
-import Add from '@carbon/icons-react/lib/Add';
-import TrashCan from '@carbon/icons-react/lib/TrashCan';
+import { Add, TrashCan, TimeFilled } from '@carbon/icons-react';
 
 export const ChatHistoryPanel = ({ 
   open, 
@@ -76,7 +74,7 @@ export const ChatHistoryPanel = ({
     >
       {chatHistory.length === 0 ? (
         <div className="history-empty-state">
-          <History size={48} />
+          <TimeFilled size={48} />
           <p>{config.app.historyEmptyMessage}</p>
         </div>
       ) : (

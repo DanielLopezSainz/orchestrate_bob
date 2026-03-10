@@ -7,7 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Header, HeaderName, HeaderGlobalBar, HeaderGlobalAction, Tag } from '@carbon/react';
-import TimeFilled from '@carbon/icons-react/lib/TimeFilled';
+import { TimeFilled } from '@carbon/icons-react';
 
 export const ChatHeader = ({ config, onToggleHistory }) => {
   const FRONTEND_BUILD = "v3.0-TEMPLATE";

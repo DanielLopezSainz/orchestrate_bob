@@ -7,8 +7,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { InlineLoading } from '@carbon/react';
-import User from '@carbon/icons-react/lib/User';
-import Bot from '@carbon/icons-react/lib/Bot';
+import { User, Bot } from '@carbon/icons-react';
 
 export const MessageList = ({ messages, isLoading, config }) => {
   const endRef = useRef(null);
