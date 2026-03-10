@@ -7,7 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Header, HeaderName, HeaderGlobalBar, HeaderGlobalAction, Tag } from '@carbon/react';
-import { History } from '@carbon/icons-react';
+import TimeFilled from '@carbon/icons-react/lib/TimeFilled';
 
 export const ChatHeader = ({ config, onToggleHistory }) => {
   const FRONTEND_BUILD = "v3.0-TEMPLATE";
@@ -31,7 +31,7 @@ export const ChatHeader = ({ config, onToggleHistory }) => {
           tooltipAlignment="end"
           onClick={onToggleHistory}
         >
-          <History size={20} />
+          <TimeFilled size={20} />
         </HeaderGlobalAction>
         <div style={{ display: 'flex', alignItems: 'center', paddingRight: '1rem', gap: '0.5rem' }}>
           <Tag type="blue" size="sm" title="Frontend Build Version">
