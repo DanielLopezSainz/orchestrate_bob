@@ -15,6 +15,9 @@ import { useChat } from './hooks/useChat';
 import appConfig from './config.json'; // 🛡️ Import central template config
 
 function App() {
+  console.log('🚀 App: Application initialized');
+  console.log('🚀 App: Config loaded:', appConfig.app.headerTitle);
+  
   const {
     messages,
     loading,

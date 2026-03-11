@@ -10,14 +10,22 @@ import { Header, HeaderName, HeaderGlobalBar, HeaderGlobalAction, Tag } from '@c
 import { TimeFilled } from '@carbon/icons-react';
 
 export const ChatHeader = ({ config, onToggleHistory }) => {
-  const FRONTEND_BUILD = "v3.0-TEMPLATE";
+  const FRONTEND_BUILD = "v3.1-ICON-FIX";
   const [backendVersion, setBackendVersion] = useState("Loading...");
 
   useEffect(() => {
+    console.log('🎨 ChatHeader: Component mounted with TimeFilled icon');
+    console.log('🎨 ChatHeader: Frontend Build:', FRONTEND_BUILD);
     fetch('/api/version')
       .then(res => res.json())
-      .then(data => setBackendVersion(data.version))
-      .catch(() => setBackendVersion("Unknown Backend"));
+      .then(data => {
+        setBackendVersion(data.version);
+        console.log('🎨 ChatHeader: Backend version:', data.version);
+      })
+      .catch(() => {
+        setBackendVersion("Unknown Backend");
+        console.error('🎨 ChatHeader: Failed to fetch backend version');
+      });
   }, []);
 
   return (
